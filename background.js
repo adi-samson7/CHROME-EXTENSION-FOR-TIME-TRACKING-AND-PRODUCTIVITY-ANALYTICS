@@ -1,131 +1,167 @@
-let currentTabId = null;
-let currentUrl = null;
-let startTime = null;
-let timer = null;
+// Tracked state
+let currentTab = {
+  id: null,
+  url: null,
+  hostname: null
+};
 
-// Helper function to safely extract hostname
+// Timing control
+let trackingInterval = null;
+let lastUpdateTimestamp = null;
+
+// Debug setup
+const DEBUG = true;
+function debugLog(...args) {
+  if (DEBUG) console.log('[TimeTracker]', ...args);
+}
+
+// Enhanced URL validation
 function getHostname(url) {
-  if (!url) return null;
-  
-  // Skip Chrome/internal pages and extension URLs
-  if (url.startsWith('chrome://') || 
-      url.startsWith('chrome-extension://') ||
-      url.startsWith('about:') ||
-      url.startsWith('file://') ||
-      url.startsWith('edge://') ||
-      url.includes('chrome.google.com/webstore') ||
-      !url.includes('.')) {
+  if (!url) {
+    debugLog('No URL provided');
     return null;
   }
-  
+
+  const invalidPatterns = [
+    /^chrome:\/\//i,
+    /^chrome-extension:\/\//i,
+    /^about:/i,
+    /^file:\/\//i,
+    /^edge:\/\//i,
+    /chrome\.google\.com\/webstore/i
+  ];
+
+  if (invalidPatterns.some(pattern => pattern.test(url))) {
+    debugLog('Invalid URL pattern:', url);
+    return null;
+  }
+
   try {
-    const urlObj = new URL(url);
-    const hostname = urlObj.hostname;
-    
-    // Skip localhost, invalid domains, and IP addresses
-    if (!hostname || 
-        hostname === 'localhost' ||
-        hostname.endsWith('.local') ||
-        !hostname.includes('.') ||
-        /^(\d+\.){3}\d+$/.test(hostname)) {
+    const { hostname } = new URL(url);
+    if (!hostname || !hostname.includes('.')) {
+      debugLog('Invalid hostname:', hostname);
       return null;
     }
-    
     return hostname;
   } catch (e) {
+    debugLog('URL parse error:', e.message);
     return null;
   }
 }
 
-// Update time for the current website
-async function updateTime() {
-  if (!currentTabId || !currentUrl) return;
-
-  const now = new Date();
-  const today = now.toISOString().split('T')[0];
-  
-  // Check if day changed
-  if (startTime && startTime.toISOString().split('T')[0] !== today) {
-    // Reset for new day
-    startTime = now;
+// Core tracking function
+async function updateTimeTracking() {
+  if (!currentTab.hostname) {
+    debugLog('No valid hostname to track');
     return;
   }
 
-  if (!startTime) {
-    startTime = now;
+  const now = Date.now();
+  const today = new Date().toISOString().split('T')[0];
+
+  if (!lastUpdateTimestamp) {
+    lastUpdateTimestamp = now;
+    debugLog('Initial time tracking started for:', currentTab.hostname);
     return;
   }
 
-  const elapsedSeconds = Math.floor((now - startTime) / 1000);
-  startTime = now;
+  const elapsedSeconds = Math.floor((now - lastUpdateTimestamp) / 1000);
+  
+  if (elapsedSeconds > 0) {
+    const { timeData = {} } = await chrome.storage.local.get(['timeData']);
+    timeData[today] = timeData[today] || {};
+    timeData[today][currentTab.hostname] = 
+      (timeData[today][currentTab.hostname] || 0) + elapsedSeconds;
 
-  const { timeData } = await chrome.storage.local.get(['timeData']);
-  
-  if (!timeData[today]) {
-    timeData[today] = {}; // Auto-creates new day entry
+    await chrome.storage.local.set({ timeData });
+    debugLog(`Tracked ${elapsedSeconds}s on ${currentTab.hostname}`);
+    
+    lastUpdateTimestamp = now - ((now - lastUpdateTimestamp) % 1000);
   }
-  
-  timeData[today][currentUrl] = (timeData[today][currentUrl] || 0) + elapsedSeconds;
-  
-  await chrome.storage.local.set({ timeData });
 }
 
-// Handle tab changes
-chrome.tabs.onActivated.addListener(async (activeInfo) => {
-  currentTabId = activeInfo.tabId;
-  const tab = await chrome.tabs.get(currentTabId);
-  const hostname = getHostname(tab.url);
+// Start/stop tracking
+function startTracking() {
+  stopTracking();
   
-  // Always stop tracking first when switching tabs
-  if (timer) {
-    clearInterval(timer);
-    await updateTime();
+  if (!currentTab.hostname) {
+    debugLog('Cannot start - no valid hostname');
+    return;
   }
+
+  debugLog('Starting tracking for:', currentTab.hostname);
+  lastUpdateTimestamp = null;
   
-  // Only start tracking if valid hostname
-  currentUrl = hostname;
-  startTime = hostname ? new Date() : null;
+  // Use both alarms and intervals for reliability
+  trackingInterval = setInterval(updateTimeTracking, 1000);
+  chrome.alarms.create('timeTracker', { periodInMinutes: 1/60 });
+}
+
+function stopTracking() {
+  if (trackingInterval) {
+    clearInterval(trackingInterval);
+    trackingInterval = null;
+  }
+  chrome.alarms.clear('timeTracker');
+  debugLog('Tracking stopped');
+}
+
+// Tab event handlers
+async function handleTabUpdate(tabId, url) {
+  const hostname = getHostname(url);
   
+  if (hostname === currentTab.hostname && tabId === currentTab.id) {
+    debugLog('Same hostname, no change needed');
+    return;
+  }
+
+  debugLog('Tab changed - previous:', currentTab.hostname, 'new:', hostname);
+  
+  // Finalize previous tracking
+  await updateTimeTracking();
+  stopTracking();
+
+  // Update current tab
+  currentTab = {
+    id: tabId,
+    url,
+    hostname
+  };
+
   if (hostname) {
-    timer = setInterval(updateTime, 1000);
+    startTracking();
+  }
+}
+
+// Event listeners
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+  const tab = await chrome.tabs.get(activeInfo.tabId);
+  handleTabUpdate(activeInfo.tabId, tab.url);
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (tabId === currentTab.id && changeInfo.url) {
+    handleTabUpdate(tabId, changeInfo.url);
   }
 });
 
-// Handle URL changes in the same tab
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (tabId === currentTabId && changeInfo.url) {
-    const hostname = getHostname(changeInfo.url);
-    
-    // Always stop tracking first when URL changes
-    if (timer) {
-      clearInterval(timer);
-      await updateTime();
-    }
-    
-    // Only start tracking if valid hostname
-    currentUrl = hostname;
-    startTime = hostname ? new Date() : null;
-    
-    if (hostname) {
-      timer = setInterval(updateTime, 1000);
-    }
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'timeTracker') {
+    updateTimeTracking();
   }
 });
 
-// Initialize when extension starts
-chrome.storage.local.get(['timeData'], (result) => {
-  if (!result.timeData) {
-    chrome.storage.local.set({ timeData: {} });
-  }
+// Initialize
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.storage.local.set({ timeData: {} });
+  debugLog('Storage initialized');
 });
 
-// Add this initialization check
 chrome.runtime.onStartup.addListener(() => {
-  const now = new Date();
-  const today = now.toISOString().split('T')[0];
-  chrome.storage.local.get(['timeData'], (result) => {
-    if (!result.timeData || !result.timeData[today]) {
-      chrome.storage.local.set({ timeData: { [today]: {} } });
+  debugLog('Extension started');
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs[0]) {
+      handleTabUpdate(tabs[0].id, tabs[0].url);
     }
   });
 });

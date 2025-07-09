@@ -3,10 +3,11 @@
   "name": "Website Time Tracker",
   "version": "1.0",
   "description": "Tracks time spent on websites with analytics",
-  "permissions": ["activeTab", "tabs", "storage"],
+  "permissions": ["activeTab", "tabs", "storage","alarms"],
   "options_page": "options.html",
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "action": {
     "default_popup": "popup.html",
