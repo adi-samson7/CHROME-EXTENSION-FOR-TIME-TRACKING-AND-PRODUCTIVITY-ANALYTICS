@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Website Classifier</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body>
+  <div class="options-container">
+    <h1>Website Productivity Classifier</h1>
+    
+    <div class="classification-section">
+      <h2>Add Website Classification</h2>
+      <div class="input-group">
+        <input type="text" id="website-input" placeholder="Enter domain (e.g., youtube.com)">
+        <select id="classification-select">
+          <option value="productive">Productive</option>
+          <option value="unproductive">Unproductive</option>
+        </select>
+        <button id="add-classification">Add</button>
+      </div>
+    </div>
+    
+    <div class="current-classifications">
+      <h2>Current Classifications</h2>
+      <div class="tabs">
+        <button class="tab-button active" data-tab="productive">Productive</button>
+        <button class="tab-button" data-tab="unproductive">Unproductive</button>
+      </div>
+      
+      <div id="productive-list" class="tab-content active">
+        <ul id="productive-websites-list"></ul>
+      </div>
+      
+      <div id="unproductive-list" class="tab-content">
+        <ul id="unproductive-websites-list"></ul>
+      </div>
+    </div>
+  </div>
+  
+  <script src="options.js"></script>
+</body>
+</html>

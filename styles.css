@@ -1,0 +1,317 @@
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  padding: 0;
+  min-width: 300px;
+  color: #333;
+}
+
+.popup-container {
+  padding: 15px;
+  text-align: center;
+}
+
+.popup-container h1 {
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+
+#current-website {
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+  margin: 0 auto;
+  text-align: center;
+}
+
+#time-counter {
+  font-size: 24px;
+  font-family: monospace;
+  margin: 15px 0;
+}
+
+button {
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 14px;
+  margin: 4px 2px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+button:hover {
+  background-color: #45a049;
+}
+
+/* Analytics page styles */
+.analytics-container {
+  padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.analytics-container h1 {
+  text-align: center;
+  width: 100%;
+  margin: 0 auto;
+  padding: 15px 0;
+}
+
+.date-selector {
+  margin: 20px 0;
+  text-align: center;
+}
+
+.chart-container {
+  margin: 20px 0;
+  width: 100%; /* Make container responsive */
+  max-width: 400px; /* Set maximum size */
+  height: 400px; /* Fixed height */
+  margin-left: auto;
+  margin-right: auto;
+}
+
+#time-chart {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.website-lists {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 30px;
+}
+
+.productive-list, .unproductive-list {
+  width: 48%;
+}
+
+.productive-list {
+  border-right: 1px solid #eee;
+  padding-right: 10px;
+}
+
+.website-lists h2 {
+  font-size: 18px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 5px;
+}
+
+.website-lists ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.website-lists li {
+  padding: 8px 0;
+  border-bottom: 1px solid #f5f5f5;
+  display: flex;
+  justify-content: space-between;
+}
+
+.website-name {
+  word-break: break-all;
+  margin-right: 10px;
+}
+
+.website-time {
+  color: #666;
+  white-space: nowrap;
+}
+
+/* Options Page Styles */
+.options-container {
+  padding: 20px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.classification-section {
+  margin-bottom: 30px;
+}
+
+.input-group {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.input-group input {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.input-group select {
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.input-group button {
+  padding: 8px 15px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.current-classifications {
+  border-top: 1px solid #eee;
+  padding-top: 20px;
+}
+
+/* Tabs container */
+.tabs {
+  display: flex;
+  margin-bottom: 15px;
+}
+
+/* Base tab button style */
+.tab-button {
+  padding: 8px 15px;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-bottom: none;
+  cursor: pointer;
+  margin-right: 5px;
+  color: #333; /* Default text color */
+}
+
+/* Productive tab - green text */
+.tab-button[data-tab="productive"] {
+  color: #4CAF50;
+}
+
+/* Unproductive tab - red text */
+.tab-button[data-tab="unproductive"] {
+  color: #ff4444;
+}
+
+/* Active tab styling */
+.tab-button.active {
+  background: white;
+  font-weight: bold;
+  border-bottom: 1px solid white;
+  margin-bottom: -1px;
+}
+
+/* Active productive tab */
+.tab-button[data-tab="productive"].active {
+  color: #4CAF50;
+  border-bottom-color: #4CAF50;
+}
+
+/* Active unproductive tab */
+.tab-button[data-tab="unproductive"].active {
+  color: #ff4444;
+  border-bottom-color: #ff4444;
+}
+
+/* Tab content */
+.tab-content {
+  display: none;
+  padding: 10px;
+  border: 1px solid #ddd;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+.tab-button:hover {
+  background: #2196F3 !important;  /* Blue background on hover */
+  color: white !important;         /* White text on hover for better contrast */
+}
+
+#productive-websites-list,
+#unproductive-websites-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+#productive-websites-list li,
+#unproductive-websites-list li {
+  padding: 8px 10px;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Remove button styles */
+.remove-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 8px;
+  color: #ff4444;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Trash icon SVG styling */
+.remove-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+  transition: all 0.2s ease;
+}
+
+.remove-btn:hover {
+  background: rgba(33, 150, 243, 0.1); /* Light blue tint */
+  color: #2196F3; /* Blue icon/text */
+}
+
+.remove-btn:hover svg {
+  fill: #2196F3;
+}
+
+/* Time totals container */
+.time-totals {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+/* Time card styling */
+.time-card {
+  padding: 15px;
+  border-radius: 8px;
+  min-width: 150px;
+  text-align: center;
+}
+
+.time-card.productive {
+  background-color: rgba(76, 175, 80, 0.1);
+  border: 1px solid #4CAF50;
+}
+
+.time-card.unproductive {
+  background-color: rgba(255, 68, 68, 0.1);
+  border: 1px solid #ff4444;
+}
+
+.time-card h3 {
+  margin: 0 0 10px 0;
+  font-size: 16px;
+}
+
+.time-card div {
+  font-size: 18px;
+  font-family: monospace;
+  font-weight: bold;
+}
