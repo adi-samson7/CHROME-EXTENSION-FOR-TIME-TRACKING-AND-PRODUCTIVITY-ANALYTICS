@@ -3,7 +3,13 @@
   "name": "Website Time Tracker",
   "version": "1.0",
   "description": "Tracks time spent on websites with analytics",
-  "permissions": ["activeTab", "tabs", "storage","alarms"],
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "storage",
+    "alarms",
+    "scripting"
+  ],
   "options_page": "options.html",
   "background": {
     "service_worker": "background.js",
@@ -21,6 +27,20 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  }
-
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "lib/chart.umd.js",
+        "lib/jspdf.umd.min.js",
+        "analytics.html"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
 }
