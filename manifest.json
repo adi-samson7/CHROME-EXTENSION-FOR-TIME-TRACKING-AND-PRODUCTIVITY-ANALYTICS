@@ -10,6 +10,9 @@
     "alarms",
     "scripting"
   ],
+  "host_permissions": [
+    "http://localhost:4000/*"
+  ],
   "options_page": "options.html",
   "background": {
     "service_worker": "background.js",
@@ -17,6 +20,7 @@
   },
   "action": {
     "default_popup": "popup.html",
+    "default_title": "Website Time Tracker",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -38,9 +42,7 @@
         "lib/jspdf.umd.min.js",
         "analytics.html"
       ],
-      "matches": [
-        "<all_urls>"
-      ]
+      "matches": ["<all_urls>"]
     }
   ]
 }
