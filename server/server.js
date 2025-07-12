@@ -5,10 +5,8 @@ const cors = require('cors');
 const app = express();
 const PORT = 4000;
 
-// Replace with your actual Chrome extension ID:
 const extensionOrigin = 'chrome-extension://njckdndcmiekpokfokebochjnobadllj';
 
-// Middleware
 app.use(cors({
   origin: extensionOrigin,
   methods: ['GET', 'POST'],
@@ -16,19 +14,16 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Root route
 app.get('/', (req, res) => {
   res.send('Backend is running');
 });
 
-// Connect to local MongoDB
 mongoose.connect('mongodb://localhost:27017/timeTrackerDB', {
   useNewUrlParser: true,
   useUnifiedTopology: true
 }).then(() => console.log('MongoDB connected'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-// Define schema and model
 const TimeEntrySchema = new mongoose.Schema({
   date: String,
   site: String,
@@ -37,7 +32,6 @@ const TimeEntrySchema = new mongoose.Schema({
 });
 const TimeEntry = mongoose.model('TimeEntry', TimeEntrySchema);
 
-// Save time entry
 app.post('/track', async (req, res) => {
   const { date, site, time, category } = req.body;
   try {
@@ -55,7 +49,6 @@ app.post('/track', async (req, res) => {
   }
 });
 
-// Get weekly report
 app.get('/weekly-report', async (req, res) => {
   try {
     const oneWeekAgo = new Date();
@@ -72,7 +65,6 @@ app.get('/weekly-report', async (req, res) => {
   }
 });
 
-// Start server
 app.listen(PORT, () => {
   console.log(`✅ Server running at http://localhost:${PORT}`);
 });

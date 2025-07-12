@@ -7,25 +7,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const tabButtons = document.querySelectorAll('.tab-button');
   const tabContents = document.querySelectorAll('.tab-content');
 
-  // Tab switching functionality
   tabButtons.forEach(button => {
     button.addEventListener('click', () => {
       const tabName = button.dataset.tab;
       
-      // Update active tab button
+      
       tabButtons.forEach(btn => btn.classList.remove('active'));
       button.classList.add('active');
       
-      // Update active tab content
+      
       tabContents.forEach(content => content.classList.remove('active'));
       document.getElementById(`${tabName}-list`).classList.add('active');
     });
   });
 
-  // Load existing classifications
+  
   loadClassifications();
 
-  // Add new classification
   addButton.addEventListener('click', addClassification);
   websiteInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') addClassification();
@@ -51,7 +49,6 @@ document.addEventListener('DOMContentLoaded', () => {
       </button>
     `;
     
-    // Get the button we just created
     const btn = li.querySelector('.remove-btn');
     btn.addEventListener('click', removeClassification);
     
@@ -59,7 +56,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
     
-    // Add event listeners to remove buttons
     document.querySelectorAll('.remove-btn').forEach(btn => {
       btn.addEventListener('click', removeClassification);
     });
@@ -69,7 +65,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const website = websiteInput.value.trim();
     if (!website) return;
     
-    // Simple domain validation
     const domainRegex = /^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}$/i;
     if (!domainRegex.test(website)) {
       alert('Please enter a valid domain (e.g., "youtube.com")');
@@ -80,11 +75,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const { websiteClassifications } = await chrome.storage.sync.get(['websiteClassifications']);
     const classifications = websiteClassifications || { productive: [], unproductive: [] };
     
-    // Remove from opposite classification if exists
     const oppositeType = classification === 'productive' ? 'unproductive' : 'productive';
     classifications[oppositeType] = classifications[oppositeType].filter(w => w !== website);
     
-    // Add to selected classification if not already there
     if (!classifications[classification].includes(website)) {
       classifications[classification].push(website);
     }
@@ -95,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function removeClassification(e) {
-    const btn = e.currentTarget; // Changed from target to currentTarget
+    const btn = e.currentTarget; 
     const website = btn.dataset.website;
     const type = btn.dataset.type;
     

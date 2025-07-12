@@ -50,7 +50,6 @@ button:hover {
   background-color: #45a049;
 }
 
-/* Analytics page styles */
 .analytics-container {
   padding: 20px;
   max-width: 800px;
@@ -71,9 +70,9 @@ button:hover {
 
 .chart-container {
   margin: 20px 0;
-  width: 100%; /* Make container responsive */
-  max-width: 400px; /* Set maximum size */
-  height: 400px; /* Fixed height */
+  width: 100%; 
+  max-width: 400px; 
+  height: 400px; 
   margin-left: auto;
   margin-right: auto;
 }
@@ -126,7 +125,6 @@ button:hover {
   white-space: nowrap;
 }
 
-/* Options Page Styles */
 .options-container {
   padding: 20px;
   max-width: 600px;
@@ -170,13 +168,11 @@ button:hover {
   padding-top: 20px;
 }
 
-/* Tabs container */
 .tabs {
   display: flex;
   margin-bottom: 15px;
 }
 
-/* Base tab button style */
 .tab-button {
   padding: 8px 15px;
   background: #f5f5f5;
@@ -184,20 +180,17 @@ button:hover {
   border-bottom: none;
   cursor: pointer;
   margin-right: 5px;
-  color: #333; /* Default text color */
+  color: #333; 
 }
 
-/* Productive tab - green text */
 .tab-button[data-tab="productive"] {
   color: #4CAF50;
 }
 
-/* Unproductive tab - red text */
 .tab-button[data-tab="unproductive"] {
   color: #ff4444;
 }
 
-/* Active tab styling */
 .tab-button.active {
   background: white;
   font-weight: bold;
@@ -205,19 +198,16 @@ button:hover {
   margin-bottom: -1px;
 }
 
-/* Active productive tab */
 .tab-button[data-tab="productive"].active {
   color: #4CAF50;
   border-bottom-color: #4CAF50;
 }
 
-/* Active unproductive tab */
 .tab-button[data-tab="unproductive"].active {
   color: #ff4444;
   border-bottom-color: #ff4444;
 }
 
-/* Tab content */
 .tab-content {
   display: none;
   padding: 10px;
@@ -229,8 +219,8 @@ button:hover {
 }
 
 .tab-button:hover {
-  background: #2196F3 !important;  /* Blue background on hover */
-  color: white !important;         /* White text on hover for better contrast */
+  background: #2196F3 !important;  
+  color: white !important;         
 }
 
 #productive-websites-list,
@@ -249,7 +239,6 @@ button:hover {
   align-items: center;
 }
 
-/* Remove button styles */
 .remove-btn {
   background: none;
   border: none;
@@ -261,7 +250,6 @@ button:hover {
   align-items: center;
 }
 
-/* Trash icon SVG styling */
 .remove-btn svg {
   width: 16px;
   height: 16px;
@@ -270,15 +258,14 @@ button:hover {
 }
 
 .remove-btn:hover {
-  background: rgba(33, 150, 243, 0.1); /* Light blue tint */
-  color: #2196F3; /* Blue icon/text */
+  background: rgba(33, 150, 243, 0.1); 
+  color: #2196F3; 
 }
 
 .remove-btn:hover svg {
   fill: #2196F3;
 }
 
-/* Time totals container */
 .time-totals {
   display: flex;
   align-items: center;
@@ -287,7 +274,6 @@ button:hover {
   margin-bottom: 20px;
 }
 
-/* Time card styling */
 .time-card {
   padding: 15px;
   border-radius: 8px;
@@ -316,7 +302,6 @@ button:hover {
   font-weight: bold;
 }
 
-/* View Tabs */
 .view-tabs {
   display: flex;
   margin-bottom: 20px;
@@ -337,7 +322,6 @@ button:hover {
   color: #4CAF50;
 }
 
-/* View Content */
 .view-content {
   display: none;
 }
@@ -346,7 +330,6 @@ button:hover {
   display: block;
 }
 
-/* Weekly Report Styles */
 .report-header {
   display: flex;
   justify-content: space-between;

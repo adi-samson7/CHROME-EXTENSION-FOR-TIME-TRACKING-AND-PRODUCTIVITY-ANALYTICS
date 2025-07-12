@@ -15,7 +15,6 @@ function debugLog(...args) {
   if (DEBUG) console.log('[TimeTracker]', ...args);
 }
 
-// === Enhanced hostname validation ===
 function getHostname(url) {
   if (!url) return null;
 
@@ -38,7 +37,6 @@ function getHostname(url) {
   }
 }
 
-// === MongoDB Sync Helper ===
 let syncQueue = {};
 let syncTimeout = null;
 
@@ -57,7 +55,7 @@ function queueMongoSync(date, hostname, seconds) {
       fetch('http://localhost:4000/track', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payloads[0]) // Send one at a time if needed
+        body: JSON.stringify(payloads[0]) 
       }).catch(err => {
         console.error('MongoDB sync failed:', err);
       });
@@ -68,7 +66,6 @@ function queueMongoSync(date, hostname, seconds) {
   }
 }
 
-// === Time tracking core ===
 async function updateTimeTracking() {
   if (!currentTab.hostname) return;
 
@@ -102,7 +99,6 @@ async function updateTimeTracking() {
   }
 }
 
-// === Alarms ===
 function setupMidnightAlarm() {
   const now = new Date();
   const midnight = new Date(now);
@@ -128,7 +124,6 @@ function handleDayChange(newDay) {
   updateTimeTracking();
 }
 
-// === Tracking control ===
 function startTracking() {
   stopTracking();
 
@@ -152,7 +147,6 @@ function stopTracking() {
   chrome.alarms.clear('timeTracker');
 }
 
-// === Tab change handlers ===
 async function handleTabUpdate(tabId, url) {
   const hostname = getHostname(url);
   if (hostname === currentTab.hostname && tabId === currentTab.id) return;
@@ -165,7 +159,6 @@ async function handleTabUpdate(tabId, url) {
   if (hostname) startTracking();
 }
 
-// === Chrome Event Listeners ===
 chrome.tabs.onActivated.addListener(async ({ tabId }) => {
   const tab = await chrome.tabs.get(tabId);
   handleTabUpdate(tabId, tab.url);
@@ -188,7 +181,6 @@ chrome.alarms.onAlarm.addListener(alarm => {
   }
 });
 
-// === Initialization ===
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.set({ timeData: {} });
   currentDay = new Date().toISOString().split('T')[0];

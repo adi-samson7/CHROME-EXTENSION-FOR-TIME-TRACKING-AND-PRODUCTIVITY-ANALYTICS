@@ -30,20 +30,17 @@ document.addEventListener('DOMContentLoaded', () => {
   
 
 
-  // Get current tab and display info
   chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
   if (tabs[0]) {
     const hostname = getHostname(tabs[0].url);
     currentWebsite.textContent = hostname || "No trackable website";
     
-    // Reset timer display if invalid page
     if (!hostname) {
       timeCounter.textContent = "00:00:00";
     }
   }
 });
   
-  // Update time counter every second
   setInterval(async () => {
     const { timeData } = await chrome.storage.local.get(['timeData']);
     const now = new Date();
@@ -54,7 +51,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const currentUrl = new URL(currentTab[0].url).hostname;
       const secondsSpent = timeData?.[today]?.[currentUrl] || 0;
       
-      // Format as HH:MM:SS
       const hours = Math.floor(secondsSpent / 3600);
       const minutes = Math.floor((secondsSpent % 3600) / 60);
       const seconds = secondsSpent % 60;
@@ -64,7 +60,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }, 1000);
   
-  // Open analytics page
   analyticsButton.addEventListener('click', () => {
     chrome.tabs.create({ url: chrome.runtime.getURL('analytics.html') });
   });
