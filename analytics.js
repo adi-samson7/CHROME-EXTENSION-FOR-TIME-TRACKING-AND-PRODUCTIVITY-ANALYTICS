@@ -157,78 +157,85 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Generate weekly report
   async function generateWeeklyReport() {
-    weeklyView.classList.add('loading');
-    try {
-      // First check if we have any data at all
-      const { timeData } = await chrome.storage.local.get(['timeData']);
-      console.log('Weekly Report - timeData:', timeData); // Debug log
-      
-      if (!timeData || Object.keys(timeData).length === 0) {
-        console.warn('No time tracking data found');
-        return {
-          productive: 0,
-          unproductive: 0,
-          byDay: {},
-          topSites: []
-        };
-      }
-
-      const { websiteClassifications = { productive: [], unproductive: [] } } = 
-        await chrome.storage.sync.get(['websiteClassifications']);
-      console.log('Website classifications:', websiteClassifications); // Debug log
-
-      // Get last 7 days (including today)
-      const dates = Array.from({ length: 7 }, (_, i) => {
-        const d = new Date();
-        d.setDate(d.getDate() - (6 - i));
-        return d.toISOString().split('T')[0];
-      });
-      console.log('Date range:', dates); // Debug log
-
-      const report = { productive: 0, unproductive: 0, byDay: {}, topSites: [] };
-      const allSites = {};
-
-      // Process each day's data
-      dates.forEach(date => {
-        report.byDay[date] = { productive: 0, unproductive: 0 };
-        
-        if (timeData[date]) {
-          Object.entries(timeData[date]).forEach(([site, seconds]) => {
-            const category = websiteClassifications.productive?.includes(site) ? 'productive' :
-                            websiteClassifications.unproductive?.includes(site) ? 'unproductive' : 'neutral';
-            
-            report[category] += seconds;
-            report.byDay[date][category] += seconds;
-            allSites[site] = (allSites[site] || 0) + seconds;
-          });
-        }
-      });
-
-      // Calculate top sites
-      report.topSites = Object.entries(allSites)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([site, time]) => ({
-          site,
-          time,
-          category: websiteClassifications.productive?.includes(site) ? 'productive' :
-                   websiteClassifications.unproductive?.includes(site) ? 'unproductive' : 'neutral'
-        }));
-
-      console.log('Generated report:', report); // Debug log
-      return report;
-    } catch (error) {
-      console.error('Error generating report:', error);
+  weeklyView.classList.add('loading');
+  try {
+    const { timeData } = await chrome.storage.local.get(['timeData']);
+    console.log('Weekly Report - timeData:', timeData);
+    
+    if (!timeData || Object.keys(timeData).length === 0) {
+      console.warn('No time tracking data found');
       return {
         productive: 0,
         unproductive: 0,
         byDay: {},
         topSites: []
       };
-    } finally {
-      weeklyView.classList.remove('loading');
     }
+
+    // Get classifications - only need productive sites
+    const { websiteClassifications = { productive: [] } } = 
+      await chrome.storage.sync.get(['websiteClassifications']);
+    const productiveSites = websiteClassifications.productive || [];
+    console.log('Productive sites:', productiveSites);
+
+    // Get last 7 days (including today)
+    const dates = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      return d.toISOString().split('T')[0];
+    });
+
+    const report = { productive: 0, unproductive: 0, byDay: {}, topSites: [] };
+    const allSites = {};
+
+    // Process each day's data
+    dates.forEach(date => {
+      report.byDay[date] = { productive: 0, unproductive: 0 };
+      
+      if (timeData[date]) {
+        Object.entries(timeData[date]).forEach(([site, seconds]) => {
+          // Skip invalid or zero time entries
+          if (!seconds || seconds <= 0) return;
+          
+          // Only check if site is productive - all others are unproductive
+          if (productiveSites.includes(site)) {
+            report.productive += seconds;
+            report.byDay[date].productive += seconds;
+          } else {
+            report.unproductive += seconds;
+            report.byDay[date].unproductive += seconds;
+          }
+          
+          // Track all sites for top sites list
+          allSites[site] = (allSites[site] || 0) + seconds;
+        });
+      }
+    });
+
+    // Calculate top sites (now showing classification status)
+    report.topSites = Object.entries(allSites)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([site, time]) => ({
+        site,
+        time,
+        category: productiveSites.includes(site) ? 'productive' : 'unproductive'
+      }));
+
+    console.log('Generated report:', report);
+    return report;
+  } catch (error) {
+    console.error('Error generating report:', error);
+    return {
+      productive: 0,
+      unproductive: 0,
+      byDay: {},
+      topSites: []
+    };
+  } finally {
+    weeklyView.classList.remove('loading');
   }
+}
 
   // Display weekly report
   function displayWeeklyReport(report) {
