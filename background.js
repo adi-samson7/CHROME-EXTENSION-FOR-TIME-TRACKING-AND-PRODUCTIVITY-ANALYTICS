@@ -1,4 +1,4 @@
-// Website Time Tracker - background service worker (MV3).
+// Productivity Tracker - background service worker (MV3).
 //
 // Design: a Manifest V3 service worker can be suspended at any time, so no
 // timers or in-memory state are relied upon. All state lives in

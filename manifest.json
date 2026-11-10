@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Website Time Tracker",
+  "name": "Productivity Tracker",
   "version": "1.0",
   "description": "Tracks time spent on websites with analytics",
   "permissions": [
@@ -20,7 +20,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Website Time Tracker",
+    "default_title": "Productivity Tracker",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",

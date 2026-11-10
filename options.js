@@ -201,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
         getGoals()
       ]);
       const backup = {
-        app: 'website-time-tracker',
+        app: 'productivity-tracker',
         version: 1,
         exportedAt: new Date().toISOString(),
         timeData, siteStates, classifications: cls, goals
@@ -210,7 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `time-tracker-backup-${localDateKey()}.json`;
+      a.download = `productivity-tracker-backup-${localDateKey()}.json`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -258,8 +258,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Validates and sanitises an imported backup.
   function validateBackup(b) {
-    if (!b || typeof b !== 'object' || b.app !== 'website-time-tracker') {
-      throw new Error('This is not a Time Tracker backup file.');
+    if (!b || typeof b !== 'object' || !['productivity-tracker', 'website-time-tracker'].includes(b.app)) {
+      throw new Error('This is not a Productivity Tracker backup file.');
     }
     const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
     const dateRe = /^\d{4}-\d{2}-\d{2}$/;
