@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const productiveTotalEl = document.getElementById('productive-total');
   const unproductiveTotalEl = document.getElementById('unproductive-total');
   let timeChart = null;
+  let lastChartKey = null;
 
   const viewTabs = document.querySelectorAll('.tab-button');
   const dailyView = document.getElementById('daily-view');
@@ -33,6 +34,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     return String(str).replace(/[&<>"']/g, c => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     }[c]));
+  }
+
+  // A site matches a listed domain if it is that domain or a subdomain of it
+  // (so "youtube.com" also covers "www.youtube.com" and "m.youtube.com").
+  function isListed(list, site) {
+    return list.some(domain => site === domain || site.endsWith('.' + domain));
   }
 
   function formatTime(seconds) {
@@ -98,12 +105,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const selectedDate = dateSelect.value;
     try {
       const { timeData } = await chrome.storage.local.get(['timeData']);
-      console.log('Loaded timeData:', timeData); 
-      
       const dailyData = timeData?.[selectedDate] || {};
-      console.log('Daily data for', selectedDate, ':', dailyData); 
-      
-      updateChart(Object.keys(dailyData), Object.values(dailyData));
+
+      // Only redraw the chart when the data changed (avoids flicker on the
+      // periodic refresh).
+      const chartKey = selectedDate + JSON.stringify(dailyData);
+      if (chartKey !== lastChartKey) {
+        lastChartKey = chartKey;
+        updateChart(Object.keys(dailyData), Object.values(dailyData));
+      }
       updateWebsiteLists(Object.keys(dailyData), dailyData);
     } catch (error) {
       console.error('Error loading daily data:', error);
@@ -147,11 +157,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   
   async function updateWebsiteLists(websites, dailyData) {
-    productiveList.innerHTML = '';
-    unproductiveList.innerHTML = '';
-    
     try {
-      const { productive = [], unproductive = [] } = await getWebsiteClassifications();
+      const { productive = [] } = await getWebsiteClassifications();
+      // Clear only after the await so overlapping refreshes cannot append
+      // duplicate rows.
+      productiveList.innerHTML = '';
+      unproductiveList.innerHTML = '';
       let productiveTotal = 0, unproductiveTotal = 0;
 
       websites.sort((a, b) => dailyData[b] - dailyData[a]).forEach(website => {
@@ -165,7 +176,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         timeEl.textContent = formatTime(seconds);
         li.append(nameEl, timeEl);
         
-        if (productive.includes(website)) {
+        if (isListed(productive, website)) {
           productiveTotal += seconds;
           productiveList.appendChild(li);
         } else {
@@ -185,7 +196,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   weeklyView.classList.add('loading');
   try {
     const { timeData } = await chrome.storage.local.get(['timeData']);
-    console.log('Weekly Report - timeData:', timeData);
     
     if (!timeData || Object.keys(timeData).length === 0) {
       console.warn('No time tracking data found');
@@ -200,7 +210,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const { websiteClassifications = { productive: [] } } = 
       await chrome.storage.sync.get(['websiteClassifications']);
     const productiveSites = websiteClassifications.productive || [];
-    console.log('Productive sites:', productiveSites);
 
     const dates = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
@@ -218,7 +227,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         Object.entries(timeData[date]).forEach(([site, seconds]) => {
           if (!seconds || seconds <= 0) return;
           
-          if (productiveSites.includes(site)) {
+          if (isListed(productiveSites, site)) {
             report.productive += seconds;
             report.byDay[date].productive += seconds;
           } else {
@@ -237,10 +246,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       .map(([site, time]) => ({
         site,
         time,
-        category: productiveSites.includes(site) ? 'productive' : 'unproductive'
+        category: isListed(productiveSites, site) ? 'productive' : 'unproductive'
       }));
 
-    console.log('Generated report:', report);
     return report;
   } catch (error) {
     console.error('Error generating report:', error);
@@ -256,7 +264,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 }
 
   function displayWeeklyReport(report) {
-    console.log('Displaying report:', report); 
     
     try {
       weeklyProductiveEl.textContent = formatTime(report.productive);
@@ -381,7 +388,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     yPos += 6;
     doc.text(`Total Unproductive Time: ${formatTime(report.unproductive)}`, margin, yPos);
     yPos += 6;
-    doc.text(`Productivity Ratio: ${productivityRatioEl.textContent}`, margin, yPos);
+    doc.text(`Productivity Ratio: ${report.productive + report.unproductive > 0 ? Math.round((report.productive / (report.productive + report.unproductive)) * 100) : 0}%`, margin, yPos);
     yPos += 15;
 
     const chartCanvas = document.getElementById('weekly-chart');
