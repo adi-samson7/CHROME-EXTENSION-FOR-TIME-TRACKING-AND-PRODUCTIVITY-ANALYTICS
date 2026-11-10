@@ -9,7 +9,13 @@
 <body>
   <div class="popup-container">
     <h1>Web Time Tracker</h1>
-    <div id="current-website">Loading...</div>
+    <div class="website-row">
+      <span id="current-website">Loading...</span>
+      <button id="copy-website" class="copy-btn" title="Copy website" aria-label="Copy website" hidden>
+        <svg class="icon-copy" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+        <svg class="icon-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" hidden><path d="M5 12l5 5L20 7"/></svg>
+      </button>
+    </div>
     <div id="time-counter">00:00:00</div>
     <div id="tracking-status" class="tracking-status"><span class="status-dot"></span><span id="status-text">Checking...</span></div>
     <button id="toggle-tracking" class="btn-primary" hidden>Start Tracking</button>

@@ -21,16 +21,39 @@ body {
   margin: 0 0 14px;
 }
 
+.website-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
 #current-website {
-  max-width: 100%;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: block;
-  margin: 0 auto;
   font-size: 14px;
   color: #555;
 }
+
+.copy-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  color: #777;
+  border-radius: 4px;
+}
+
+.copy-btn:hover { background-color: #e8ebee; color: #333; }
+.copy-btn.copied, .copy-btn.copied:hover { color: #2e7d32; background: transparent; }
+.copy-btn svg[hidden] { display: none; }
 
 #time-counter {
   font-size: 32px;

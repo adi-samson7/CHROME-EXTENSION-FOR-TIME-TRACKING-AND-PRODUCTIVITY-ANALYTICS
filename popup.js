@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const toggleButton = document.getElementById('toggle-tracking');
   const analyticsButton = document.getElementById('view-analytics');
 
+  const copyButton = document.getElementById('copy-website');
   const statusText = document.getElementById('status-text');
   let current = { hostname: null, siteState: null };
 
@@ -25,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function render(status) {
     if (!status || status.error) {
       currentWebsite.textContent = 'Tracker unavailable';
+      copyButton.hidden = true;
       statusText.textContent = '';
       toggleButton.hidden = true;
       return;
@@ -32,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     current = { hostname: status.hostname, siteState: status.siteState };
     currentWebsite.textContent = status.hostname || 'No trackable website';
+    copyButton.hidden = !status.hostname;
     timeCounter.textContent = formatTime(status.seconds);
     statusEl.className = 'tracking-status';
 
@@ -77,6 +80,33 @@ document.addEventListener('DOMContentLoaded', () => {
     toggleButton.disabled = true;
     render(await send({ type: 'setSiteState', hostname: current.hostname, state }));
     toggleButton.disabled = false;
+  });
+
+  let copyTimeout = null;
+  copyButton.addEventListener('click', async () => {
+    if (!current.hostname) return;
+    try {
+      await navigator.clipboard.writeText(current.hostname);
+    } catch {
+      // Fallback for contexts where the async clipboard API is blocked.
+      const ta = document.createElement('textarea');
+      ta.value = current.hostname;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    }
+    copyButton.classList.add('copied');
+    copyButton.title = 'Copied!';
+    copyButton.querySelector('.icon-copy').hidden = true;
+    copyButton.querySelector('.icon-check').hidden = false;
+    clearTimeout(copyTimeout);
+    copyTimeout = setTimeout(() => {
+      copyButton.classList.remove('copied');
+      copyButton.title = 'Copy website';
+      copyButton.querySelector('.icon-copy').hidden = false;
+      copyButton.querySelector('.icon-check').hidden = true;
+    }, 1200);
   });
 
   analyticsButton.addEventListener('click', () => {
