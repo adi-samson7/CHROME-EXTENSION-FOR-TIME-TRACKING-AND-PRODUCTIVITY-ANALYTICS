@@ -14,8 +14,9 @@ MENTOR NAME : NEELA SANTHOSH KUMAR
 
 DESCRIPTION OF TASK PERFORMED :
 
-This task involved the development of a Chrome Extension that tracks the amount of time a user spends on various websites in real-time. 
-The primary goal was to create a system that operates seamlessly in the background, capturing and storing browsing behavior while providing useful visual insights and analytics on a dashboard.
+This task involved the development of a Chrome Extension (Manifest V3) that tracks the amount of time a user spends on various websites in real-time.
+The extension runs quietly in the background, records time per website, lets the user classify sites as productive or unproductive, and turns the data into charts, insights and exportable reports.
+All data is stored locally in the browser - there is no server, account or database, and nothing leaves the user's computer.
 
 
 <img width="1920" height="1080" alt="Screenshot (255)" src="https://github.com/user-attachments/assets/472287f0-a754-428a-8539-1f5d6abbc076" />
@@ -23,100 +24,169 @@ The primary goal was to create a system that operates seamlessly in the backgrou
 
 OBJECTIVES:
 
-Build a Chrome Extension that automatically starts tracking time spent on each website.
+Track time spent on each website accurately, only while the user is really using it.
 
-Ensure that time is tracked accurately and continuously while the tab is active.
+Let the user decide which sites to track (Start Tracking / Pause / Resume per site).
 
-Store all tracked data locally in the browser (chrome.storage.local) - no server or account needed, nothing leaves the user's computer.
+Display live tracked time and goal progress in the extension popup.
 
-Display live tracked time in the extension popup.
-
-Show historical analytics and productivity insights in a separate dashboard (dashboard.html).
+Show daily and period analytics, trends and productivity insights on an analytics page.
 
 Allow classification of websites as productive or unproductive.
 
+Help the user stay on target with daily goals and per-site limits.
+
+Keep the user's data private, and give them backup and restore.
+
 Ensure the system is resilient, minimal, and user-friendly.
 
-Key Features Implemented:
+KEY FEATURES:
 
-1. Real-Time Timer & Tracking Logic
+1. Accurate Time Tracking
 
-A background script constantly monitors the currently active tab.
+Tracking starts per site: a new website shows a "Start Tracking" button, then Pause / Resume.
 
-Once a website is opened or switched to, a timer starts automatically.
+The timer only runs while the tab is active, the browser window is focused and the user is not idle (60 seconds). Playing audio or video counts as activity.
 
-If the tab is changed, closed, or the user becomes inactive, the timer stops.
+Time is credited against the local date, and is split correctly when it crosses midnight, so the day always flips at local midnight.
 
-Time is saved locally in chrome.storage.local, so it survives browser restarts.
+The Manifest V3 service worker can be suspended at any time, so no in-memory timers are used. State is kept in chrome.storage and every event or 30-second alarm re-syncs the tracker.
 
-A flush mechanism ensures no time is lost during popup close or extension shutdown.
+"www.example.com" and "example.com" are tracked as one site.
 
-2. Popup UI :
+If the computer sleeps or the browser is suspended, the gap is not counted.
 
-Displays the hostname of the active site.
+2. Popup
 
-Shows the live timer updating every second.
+Shows the current website (with a copy button), a live timer, and a status of Tracking, Paused or Waiting.
 
-Timer values come from the locally stored data (ensures consistency and avoids rewind bugs).
+Start Tracking / Pause / Resume button for the current site.
 
-Saves time locally as you browse.
+Daily goal progress bar, and the time left on a site limit (or a notice that it has been reached).
 
-3. Local Storage:
+One-click Productive / Unproductive buttons for sites that are not classified yet.
 
-All data is stored locally on the user's computer; there is no backend server.
+Shortcuts to the analytics page and the settings page.
 
-Time entries are grouped by date and website in chrome.storage.local (with the unlimitedStorage permission), and can be exported / restored as a JSON backup from the Settings page.
+Modern minimalist "liquid glass" design.
 
-4. Analytics Dashboard:
+3. Analytics Page
 
-Visual representation of time spent using Pie Charts and Daily/Weekly reports.
+Daily View: pick any date to see a pie chart of productive vs unproductive time, plus lists of productive, unproductive and unclassified sites with search and sorting. Unclassified sites can be classified right from the list.
 
-Calendar component allows users to pick a date and see a breakdown of time tracked on that day.
+Report View: choose the last 7, 14 or 30 days, this month, or a custom date range.
 
-Productive vs Unproductive time is shown for each day.
+Summary cards for productive, unproductive and unclassified time, and the productivity ratio.
 
-5. Persistent Storage:
+Insights: trend compared with the previous period, best and worst day, daily average, total tracked time and goal streak.
 
-Uses chrome.storage.local (time data) and chrome.storage.sync (classifications and goals).
+Stacked bar chart per day, top 10 sites, and a daily breakdown table that includes the weekday.
 
-Analytics and reports are computed in the extension from the locally stored data.
+A prompt that lists sites still needing a category.
 
-Technical Stack:
+Export the report as a PDF.
 
-Frontend (Extension UI):
+Pages refresh automatically and roll over at midnight.
 
-HTML, CSS, Vanilla JavaScript
+4. Settings Page
 
-Chrome Extension APIs (chrome.tabs, chrome.runtime, chrome.storage)
+Add, search, sort and remove productive / unproductive websites.
 
-Chart.js for visual analytics
+Daily productive goal (in minutes) and per-site daily limits, with notifications when a goal or limit is reached (once per day).
 
-Storage:
+Backup and Restore: export all data as a JSON file and restore it later. Imported files are validated and size-limited before they replace any data.
 
-chrome.storage.local / sync / session (no backend)
+Option to run the first-time setup again.
 
-Data Flow:
+5. First-Run Onboarding
 
-Real-time timer in popup script
+A short welcome page explains how the extension works, lets the user pick common sites as productive or unproductive, and sets a daily goal.
 
-Background script monitors tab activity
+6. Privacy and Storage
 
-Background script saves usage data to chrome.storage.local
+Time data is stored in chrome.storage.local (with the unlimitedStorage permission).
 
-Analytics page reads the local data and renders charts
+Website classifications and goals are stored in chrome.storage.sync, so they follow the user across their signed-in Chrome devices. Sync storage has size limits, so the extension warns the user if a list grows too large.
 
-Final Outcome
+The live tracking state is kept in chrome.storage.session.
+
+The extension makes no network requests. All scripts and charts are bundled, no external fonts or icon files are loaded, and a strict content security policy is used.
+
+TECHNICAL STACK:
+
+Extension UI:
+
+HTML, CSS (glassmorphism), Vanilla JavaScript
+
+Chrome Extension APIs (tabs, windows, storage, alarms, idle, notifications, runtime)
+
+Manifest V3 background service worker (ES module)
+
+Libraries (bundled in /lib):
+
+Chart.js 4.5.0 for charts
+
+jsPDF 4.2.1 for PDF reports
+
+DATA FLOW:
+
+Background service worker watches tab, window and idle events and a 30-second alarm
+
+Elapsed time is credited to the active site and saved to chrome.storage.local
+
+Popup and analytics pages read the stored data and render timers, charts and reports
+
+Classifications and goals are read from chrome.storage.sync and used for the productive / unproductive split and notifications
+
+PROJECT STRUCTURE:
+
+manifest.json - extension configuration and permissions
+
+background.js - tracking engine, alarms, goal / limit notifications
+
+common.js - shared helpers (dates, formatting, classification, goals, storage limits)
+
+popup.html / popup.js - toolbar popup
+
+analytics.html / analytics.js - daily view, report view and PDF export
+
+options.html / options.js - classifications, goals and limits, backup and restore
+
+onboarding.html / onboarding.js - first-run setup
+
+styles.css - shared styles
+
+lib/ - Chart.js and jsPDF
+
+HOW TO INSTALL:
+
+1. Open chrome://extensions and turn on Developer mode.
+
+2. Click "Load unpacked" and select this project folder.
+
+3. Open the extension from the toolbar on any website and press Start Tracking.
+
+KNOWN LIMITATIONS:
+
+Data lives only in the user's browser profile and is stored unencrypted. Uninstalling the extension or losing the profile deletes it, so use Backup regularly.
+
+Time history is not synced between devices (only classifications and goals are).
+
+All time data is kept in a single storage entry, which is fine for years of normal use.
+
+FINAL OUTCOME:
+
 This task resulted in a fully functioning Chrome Extension that:
 
-Accurately tracks time spent per site.
+Accurately tracks time spent per site and handles idle time, focus and midnight correctly.
 
-Displays a live-updating timer.
+Displays a live-updating timer, goal progress and limit warnings.
 
-Stores all tracked data locally and privately on the user's computer.
+Offers analytics with trends, streaks, best and worst days, and PDF export.
 
-Offers a visual analytics dashboard with productivity breakdowns.
+Stores all tracked data locally and privately on the user's computer, with backup and restore.
 
-This lays the foundation for future features such as classification management, user authentication, long-term productivity reports, and exporting usage summaries.
+Possible future work: optional cloud sync of history, data encryption, and automated tests for the date logic.
 
 OUTPUT:
 

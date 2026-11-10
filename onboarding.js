@@ -50,16 +50,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const goals = await getGoals();
   const goalInput = document.getElementById('goal-minutes');
-  goalInput.value = goals.dailyProductiveMinutes || 120;
+  goalInput.value = Number.isFinite(goals.dailyProductiveMinutes) ? goals.dailyProductiveMinutes : 120;
 
   document.getElementById('finish').addEventListener('click', async () => {
     const minutes = Number(goalInput.value);
     const safeMinutes = Number.isFinite(minutes) && minutes >= 0 && minutes <= 1440 ? Math.round(minutes) : 120;
 
     try {
+      // Apply only what the user changed on this page to the latest saved
+      // lists, so sites classified elsewhere in the meantime are kept.
+      const latest = await getClassifications();
+      const merged = { productive: new Set(latest.productive), unproductive: new Set(latest.unproductive) };
+      for (const type of ['productive', 'unproductive']) {
+        const opposite = type === 'productive' ? 'unproductive' : 'productive';
+        for (const domain of selected[type]) {
+          if (!existing[type].includes(domain)) {   // newly chosen here
+            merged[type].add(domain);
+            merged[opposite].delete(domain);
+          }
+        }
+        for (const domain of existing[type]) {
+          if (!selected[type].has(domain)) merged[type].delete(domain); // deselected here
+        }
+      }
       await TT.saveClassifications({
-        productive: [...selected.productive],
-        unproductive: [...selected.unproductive]
+        productive: [...merged.productive],
+        unproductive: [...merged.unproductive]
       });
       const current = await getGoals();
       current.dailyProductiveMinutes = safeMinutes;
