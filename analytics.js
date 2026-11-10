@@ -17,6 +17,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   const exportPdfBtn = document.getElementById('export-pdf');
   let weeklyChart = null;
 
+  // Local (not UTC) YYYY-MM-DD so days flip at local midnight.
+  function localDateKey(date = new Date()) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  function parseLocalDate(key) {
+    return new Date(`${key}T00:00:00`);
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+
   function formatTime(seconds) {
     seconds = seconds || 0; 
     const hours = Math.floor(seconds / 3600);
@@ -54,12 +72,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  const today = new Date().toISOString().split('T')[0];
+  let today = localDateKey();
   dateSelect.value = today;
   dateSelect.max = today;
   dateSelect.addEventListener('change', loadDataForDate);
   
   loadDataForDate();
+
+  // Keep the page in sync with the clock: roll over at midnight and refresh
+  // live data for the current day.
+  setInterval(() => {
+    const now = localDateKey();
+    if (now !== today) {
+      const wasViewingToday = dateSelect.value === today;
+      today = now;
+      dateSelect.max = today;
+      if (wasViewingToday) dateSelect.value = today;
+      loadDataForDate();
+    } else if (dateSelect.value === today && dailyView.classList.contains('active')) {
+      loadDataForDate();
+    }
+  }, 30 * 1000);
   
   async function loadDataForDate() {
     const selectedDate = dateSelect.value;
@@ -124,10 +157,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       websites.sort((a, b) => dailyData[b] - dailyData[a]).forEach(website => {
         const seconds = dailyData[website] || 0;
         const li = document.createElement('li');
-        li.innerHTML = `
-          <span class="website-name">${website}</span>
-          <span class="website-time">${formatTime(seconds)}</span>
-        `;
+        const nameEl = document.createElement('span');
+        nameEl.className = 'website-name';
+        nameEl.textContent = website;
+        const timeEl = document.createElement('span');
+        timeEl.className = 'website-time';
+        timeEl.textContent = formatTime(seconds);
+        li.append(nameEl, timeEl);
         
         if (productive.includes(website)) {
           productiveTotal += seconds;
@@ -169,7 +205,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const dates = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
-      return d.toISOString().split('T')[0];
+      return localDateKey(d);
     });
 
     const report = { productive: 0, unproductive: 0, byDay: {}, topSites: [] };
@@ -232,8 +268,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       topSitesList.innerHTML = report.topSites.length > 0 
         ? report.topSites.map(site => `
-            <li class="${site.category}">
-              <span>${site.site}</span>
+            <li class="${escapeHtml(site.category)}">
+              <span>${escapeHtml(site.site)}</span>
               <span>${formatTime(site.time)}</span>
             </li>
           `).join('')
@@ -241,7 +277,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       dailyTableBody.innerHTML = Object.entries(report.byDay).map(([date, data]) => `
         <tr>
-          <td>${new Date(date).toLocaleDateString()}</td>
+          <td>${parseLocalDate(date).toLocaleDateString()}</td>
           <td>${formatTime(data.productive)}</td>
           <td>${formatTime(data.unproductive)}</td>
         </tr>
@@ -265,7 +301,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   const labels = dates.map(date => {
-    const d = new Date(date);
+    const d = parseLocalDate(date);
     const dayName = d.toLocaleDateString(undefined, { weekday: 'short' });
     const dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     return `${dayName}\n${dateStr}`; 

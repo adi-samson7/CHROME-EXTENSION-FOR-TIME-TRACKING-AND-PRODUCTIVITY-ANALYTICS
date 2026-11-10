@@ -1,18 +1,39 @@
-let currentTab = {
-  id: null,
-  url: null,
-  hostname: null
-};
+// Website Time Tracker - background service worker (MV3).
+//
+// Design: a Manifest V3 service worker can be suspended at any time, so no
+// timers or in-memory state are relied upon. All state lives in
+// chrome.storage (session for the "current tracking context", local for
+// data). Every event / alarm calls sync(), which:
+//   1. credits the time elapsed since the last sync to the previously
+//      tracked site (split at local midnight),
+//   2. re-evaluates what is being tracked now (active tab, focus, idle, pause).
 
-let trackingInterval = null;
-let lastUpdateTimestamp = null;
-let currentDay = null;
-let dayCheckInterval = null;
-const MIDNIGHT_ALARM_NAME = 'midnightTransition';
+const SERVER_URL = 'http://localhost:4000';
+const TICK_ALARM = 'tick';
+const MIDNIGHT_ALARM = 'midnight';
+const IDLE_SECONDS = 60;
+// If more time than this passed since the last sync we assume the computer
+// slept / the browser was suspended, and do not credit the gap.
+const MAX_GAP_MS = 90 * 1000;
 
-const DEBUG = true;
+const DEBUG = false;
 function debugLog(...args) {
   if (DEBUG) console.log('[TimeTracker]', ...args);
+}
+
+// ---------- helpers ----------
+
+// Local (not UTC) YYYY-MM-DD, so the "day" flips at local midnight.
+function localDateKey(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function nextLocalMidnight(ts) {
+  const d = new Date(ts);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
 }
 
 function getHostname(url) {
@@ -26,7 +47,6 @@ function getHostname(url) {
     /^edge:\/\//i,
     /chrome\.google\.com\/webstore/i
   ];
-
   if (invalidPatterns.some(p => p.test(url))) return null;
 
   try {
@@ -37,169 +57,257 @@ function getHostname(url) {
   }
 }
 
-let syncQueue = {};
-let syncTimeout = null;
-
-function queueMongoSync(date, hostname, seconds) {
-  const key = `${date}|${hostname}`;
-  syncQueue[key] = (syncQueue[key] || 0) + seconds;
-
-  if (!syncTimeout) {
-    syncTimeout = setTimeout(() => {
-      const payloads = Object.entries(syncQueue).map(([key, seconds]) => {
-        const [date, site] = key.split('|');
-        return { date, site, time: seconds };
-      });
-
-      debugLog('Sending to MongoDB:', payloads);
-      fetch('http://localhost:4000/track', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payloads[0]) 
-      }).catch(err => {
-        console.error('MongoDB sync failed:', err);
-      });
-
-      syncQueue = {};
-      syncTimeout = null;
-    }, 5000);
-  }
+// Serialise all storage read-modify-write cycles.
+let lock = Promise.resolve();
+function withLock(fn) {
+  const run = lock.then(fn);
+  lock = run.catch(() => {});
+  return run;
 }
 
-async function updateTimeTracking() {
-  if (!currentTab.hostname) return;
+// ---------- crediting time ----------
 
-  const now = new Date();
-  const today = now.toISOString().split('T')[0];
+// Adds the time between state.lastTs and `now` to state.hostname, split at
+// local midnight. Returns the new "cursor" (so sub-second remainders are kept).
+async function creditElapsed(state, now) {
+  if (!state || !state.active || !state.hostname || !state.lastTs) return now;
+  if (now - state.lastTs > MAX_GAP_MS || now < state.lastTs) return now;
 
-  if (currentDay && currentDay !== today) {
-    lastUpdateTimestamp = now;
-    currentDay = today;
+  let cursor = state.lastTs;
+  const additions = {}; // date -> seconds
+
+  while (cursor < now) {
+    const midnight = nextLocalMidnight(cursor);
+    const segEnd = Math.min(now, midnight);
+    const secs = Math.floor((segEnd - cursor) / 1000);
+    if (secs > 0) {
+      const date = localDateKey(new Date(cursor));
+      additions[date] = (additions[date] || 0) + secs;
+    }
+    if (segEnd === midnight) {
+      cursor = midnight; // drop the <1s remainder at a day boundary
+    } else if (secs > 0) {
+      cursor += secs * 1000;
+    } else {
+      break;
+    }
   }
 
-  if (!lastUpdateTimestamp) {
-    lastUpdateTimestamp = now;
-    currentDay = today;
-    return;
+  const dates = Object.keys(additions);
+  if (dates.length === 0) return cursor;
+
+  const { timeData = {}, syncQueue = {} } =
+    await chrome.storage.local.get(['timeData', 'syncQueue']);
+
+  for (const date of dates) {
+    const secs = additions[date];
+    timeData[date] = timeData[date] || {};
+    timeData[date][state.hostname] = (timeData[date][state.hostname] || 0) + secs;
+
+    const key = `${date}|${state.hostname}`;
+    syncQueue[key] = (syncQueue[key] || 0) + secs;
+    debugLog(`Tracked ${secs}s on ${state.hostname} (${date})`);
   }
 
-  const elapsed = Math.floor((now - lastUpdateTimestamp) / 1000);
-  if (elapsed > 0) {
-    const { timeData = {} } = await chrome.storage.local.get(['timeData']);
-    timeData[today] = timeData[today] || {};
-    timeData[today][currentTab.hostname] =
-      (timeData[today][currentTab.hostname] || 0) + elapsed;
-    await chrome.storage.local.set({ timeData });
-
-    debugLog(`Tracked ${elapsed}s on ${currentTab.hostname}`);
-
-    queueMongoSync(today, currentTab.hostname, elapsed);
-
-    lastUpdateTimestamp = now - ((now - lastUpdateTimestamp) % 1000);
-  }
+  await chrome.storage.local.set({ timeData, syncQueue });
+  return cursor;
 }
 
-function setupMidnightAlarm() {
-  const now = new Date();
-  const midnight = new Date(now);
-  midnight.setDate(midnight.getDate() + 1);
-  midnight.setHours(0, 0, 1, 0);
+// ---------- current context ----------
 
-  chrome.alarms.create(MIDNIGHT_ALARM_NAME, {
-    when: midnight.getTime(),
-    periodInMinutes: 1440
+// Per-site tracking state, persisted in chrome.storage.local.siteStates:
+//   'tracking' | 'paused'. A site with no entry is 'new' (not started yet),
+//   unless it already has recorded history, which counts as 'tracking'.
+async function getSiteState(hostname) {
+  if (!hostname) return null;
+  const { siteStates = {}, timeData = {} } =
+    await chrome.storage.local.get(['siteStates', 'timeData']);
+  if (siteStates[hostname]) return siteStates[hostname];
+  const hasHistory = Object.values(timeData).some(day => day && day[hostname] > 0);
+  return hasHistory ? 'tracking' : 'new';
+}
+
+async function evaluateContext() {
+  let tab = null;
+  let focused = false;
+  try {
+    const win = await chrome.windows.getLastFocused({ populate: true });
+    focused = !!win.focused;
+    tab = (win.tabs || []).find(t => t.active) || null;
+  } catch {
+    // no window available
+  }
+
+  let idleState = 'active';
+  try {
+    idleState = await chrome.idle.queryState(IDLE_SECONDS);
+  } catch {
+    // idle API unavailable - assume active
+  }
+
+  const hostname = tab ? getHostname(tab.url) : null;
+  const siteState = await getSiteState(hostname);
+  // Playing audio (e.g. watching a video) counts as activity while "idle",
+  // but never while the screen is locked.
+  const userPresent =
+    idleState === 'active' || (idleState === 'idle' && !!tab && !!tab.audible);
+
+  return {
+    hostname,
+    tabId: tab ? tab.id : null,
+    siteState,
+    idleState,
+    focused,
+    active: siteState === 'tracking' && focused && userPresent
+  };
+}
+
+function sync() {
+  return withLock(async () => {
+    const now = Date.now();
+    const { trackerState } = await chrome.storage.session.get('trackerState');
+
+    const cursor = await creditElapsed(trackerState, now);
+    const ctx = await evaluateContext();
+
+    const continuing =
+      trackerState && trackerState.active && ctx.active &&
+      trackerState.hostname === ctx.hostname;
+
+    const next = { ...ctx, lastTs: continuing ? cursor : now };
+    await chrome.storage.session.set({ trackerState: next });
+    return next;
   });
 }
 
-function checkDayChange() {
-  const today = new Date().toISOString().split('T')[0];
-  if (currentDay !== today) {
-    handleDayChange(today);
+// ---------- MongoDB sync (persistent queue with retry) ----------
+
+let flushing = false;
+
+async function flushQueue() {
+  if (flushing) return;
+  flushing = true;
+  try {
+    const { syncQueue = {} } = await chrome.storage.local.get('syncQueue');
+    const entries = Object.entries(syncQueue).filter(([, secs]) => secs > 0);
+    if (entries.length === 0) return;
+
+    const payload = entries.map(([key, time]) => {
+      const i = key.indexOf('|');
+      return { date: key.slice(0, i), site: key.slice(i + 1), time };
+    });
+
+    try {
+      const res = await fetch(`${SERVER_URL}/track`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(8000)
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch (err) {
+      // Keep the queue; it will be retried on the next tick.
+      console.warn('MongoDB sync failed, will retry:', err.message);
+      return;
+    }
+
+    debugLog('Synced to MongoDB:', payload);
+    await withLock(async () => {
+      const { syncQueue: current = {} } = await chrome.storage.local.get('syncQueue');
+      for (const [key, sent] of entries) {
+        const remaining = (current[key] || 0) - sent;
+        if (remaining > 0) current[key] = remaining;
+        else delete current[key];
+      }
+      await chrome.storage.local.set({ syncQueue: current });
+    });
+  } finally {
+    flushing = false;
   }
 }
 
-function handleDayChange(newDay) {
-  currentDay = newDay;
-  lastUpdateTimestamp = null;
-  updateTimeTracking();
+// ---------- alarms ----------
+
+function setupAlarms() {
+  // 30s is the minimum period Chrome allows for alarms.
+  chrome.alarms.create(TICK_ALARM, { periodInMinutes: 0.5 });
+  chrome.alarms.create(MIDNIGHT_ALARM, { when: nextLocalMidnight(Date.now()) + 1000 });
 }
 
-function startTracking() {
-  stopTracking();
-
-  if (!currentTab.hostname) return;
-
-  debugLog('Start tracking:', currentTab.hostname);
-  lastUpdateTimestamp = null;
-  currentDay = new Date().toISOString().split('T')[0];
-
-  trackingInterval = setInterval(updateTimeTracking, 1000);
-  chrome.alarms.create('timeTracker', { periodInMinutes: 1 / 60 });
-
-  if (!dayCheckInterval) {
-    dayCheckInterval = setInterval(checkDayChange, 5 * 60 * 1000);
+chrome.alarms.onAlarm.addListener(async alarm => {
+  if (alarm.name === TICK_ALARM) {
+    await sync();
+    await flushQueue();
+  } else if (alarm.name === MIDNIGHT_ALARM) {
+    await sync(); // splits any time across midnight into the right days
+    chrome.alarms.create(MIDNIGHT_ALARM, { when: nextLocalMidnight(Date.now()) + 1000 });
   }
-}
-
-function stopTracking() {
-  clearInterval(trackingInterval);
-  trackingInterval = null;
-  chrome.alarms.clear('timeTracker');
-}
-
-async function handleTabUpdate(tabId, url) {
-  const hostname = getHostname(url);
-  if (hostname === currentTab.hostname && tabId === currentTab.id) return;
-
-  await updateTimeTracking();
-  stopTracking();
-
-  currentTab = { id: tabId, url, hostname };
-
-  if (hostname) startTracking();
-}
-
-chrome.tabs.onActivated.addListener(async ({ tabId }) => {
-  const tab = await chrome.tabs.get(tabId);
-  handleTabUpdate(tabId, tab.url);
 });
 
+// ---------- events ----------
+
+chrome.tabs.onActivated.addListener(() => sync());
+chrome.tabs.onRemoved.addListener(() => sync());
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-  if (tabId === currentTab.id && changeInfo.url) {
-    handleTabUpdate(tabId, changeInfo.url);
+  if (changeInfo.url || changeInfo.audible !== undefined || changeInfo.status === 'complete') {
+    sync();
   }
 });
+chrome.windows.onFocusChanged.addListener(() => sync());
 
-chrome.alarms.onAlarm.addListener(alarm => {
-  if (alarm.name === 'timeTracker') {
-    const today = new Date().toISOString().split('T')[0];
-    if (currentDay !== today) handleDayChange(today);
-    updateTimeTracking();
-  } else if (alarm.name === MIDNIGHT_ALARM_NAME) {
-    handleDayChange(new Date().toISOString().split('T')[0]);
-    setupMidnightAlarm();
-  }
-});
+chrome.idle.setDetectionInterval(IDLE_SECONDS);
+chrome.idle.onStateChanged.addListener(() => sync());
 
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.local.set({ timeData: {} });
-  currentDay = new Date().toISOString().split('T')[0];
-  setupMidnightAlarm();
+chrome.runtime.onInstalled.addListener(async () => {
+  const { timeData } = await chrome.storage.local.get('timeData');
+  // Never wipe existing history (this also fires on extension updates).
+  if (!timeData) await chrome.storage.local.set({ timeData: {} });
+  setupAlarms();
+  sync();
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  currentDay = new Date().toISOString().split('T')[0];
-  setupMidnightAlarm();
-  dayCheckInterval = setInterval(checkDayChange, 5 * 60 * 1000);
-
-  chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
-    if (tabs[0]) {
-      handleTabUpdate(tabs[0].id, tabs[0].url);
-    }
-  });
+  setupAlarms();
+  sync();
 });
 
-chrome.runtime.onSuspend.addListener(() => {
-  clearInterval(dayCheckInterval);
-  dayCheckInterval = null;
+// Runs every time the service worker (re)starts.
+setupAlarms();
+sync();
+
+// ---------- popup messaging ----------
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  (async () => {
+    if (msg && msg.type === 'setSiteState' && msg.hostname &&
+        ['tracking', 'paused'].includes(msg.state)) {
+      await withLock(async () => {
+        // Credit time up to now under the old state before switching.
+        const { trackerState } = await chrome.storage.session.get('trackerState');
+        await creditElapsed(trackerState, Date.now());
+        const { siteStates = {} } = await chrome.storage.local.get('siteStates');
+        siteStates[msg.hostname] = msg.state;
+        await chrome.storage.local.set({ siteStates });
+        // Force a fresh baseline for the new state.
+        await chrome.storage.session.set({ trackerState: { ...trackerState, active: false } });
+      });
+    }
+    if (msg && (msg.type === 'getStatus' || msg.type === 'setSiteState')) {
+      const state = await sync();
+      if (msg.type === 'setSiteState') flushQueue();
+      const { timeData = {} } = await chrome.storage.local.get('timeData');
+      const seconds = state.hostname
+        ? (timeData[localDateKey()]?.[state.hostname] || 0)
+        : 0;
+      sendResponse({
+        hostname: state.hostname,
+        siteState: state.siteState,
+        active: state.active,
+        idleState: state.idleState,
+        focused: state.focused,
+        seconds
+      });
+    }
+  })().catch(err => sendResponse({ error: err.message }));
+  return true; // async response
 });

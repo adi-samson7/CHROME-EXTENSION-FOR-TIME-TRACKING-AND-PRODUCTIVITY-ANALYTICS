@@ -42,23 +42,20 @@ document.addEventListener('DOMContentLoaded', () => {
   
   websites.forEach(website => {
     const li = document.createElement('li');
-    li.innerHTML = `
-      <span>${website}</span>
-      <button class="remove-btn" data-website="${website}" data-type="${type}">
-        <i class="material-icons">delete</i>
-      </button>
-    `;
-    
-    const btn = li.querySelector('.remove-btn');
+
+    const name = document.createElement('span');
+    name.textContent = website;
+
+    const btn = document.createElement('button');
+    btn.className = 'remove-btn';
+    btn.dataset.website = website;
+    btn.dataset.type = type;
+    btn.innerHTML = '<i class="material-icons">delete</i>';
     btn.addEventListener('click', removeClassification);
-    
+
+    li.append(name, btn);
     listElement.appendChild(li);
   });
-
-    
-    document.querySelectorAll('.remove-btn').forEach(btn => {
-      btn.addEventListener('click', removeClassification);
-    });
   }
 
   async function addClassification() {

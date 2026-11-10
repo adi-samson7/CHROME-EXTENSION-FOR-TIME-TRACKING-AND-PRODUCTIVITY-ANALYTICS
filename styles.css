@@ -7,30 +7,91 @@ body {
 }
 
 .popup-container {
-  padding: 15px;
+  width: 280px;
+  padding: 18px 16px 16px;
   text-align: center;
+  box-sizing: content-box;
 }
 
 .popup-container h1 {
-  font-size: 16px;
-  margin-bottom: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin: 0 0 14px;
 }
 
 #current-website {
-  max-width: 200px;
+  max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   display: block;
   margin: 0 auto;
-  text-align: center;
+  font-size: 14px;
+  color: #555;
 }
 
 #time-counter {
-  font-size: 24px;
-  font-family: monospace;
-  margin: 15px 0;
+  font-size: 32px;
+  font-family: Consolas, monospace;
+  margin: 10px 0 6px;
 }
+
+.tracking-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 14px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #bbb;
+}
+
+.tracking-status.active { color: #2e7d32; }
+.tracking-status.active .status-dot { background: #4CAF50; }
+.tracking-status.paused { color: #e65100; }
+.tracking-status.paused .status-dot { background: #FF9800; }
+
+.btn-primary,
+.btn-danger {
+  display: block;
+  width: 100%;
+  margin: 0 0 12px;
+  padding: 10px 16px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.btn-primary { background-color: #4CAF50; }
+.btn-primary:hover { background-color: #45a049; }
+.btn-danger { background-color: #e53935; }
+.btn-danger:hover { background-color: #c62828; }
+
+.secondary-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-secondary {
+  flex: 1;
+  margin: 0;
+  padding: 8px 6px;
+  font-size: 13px;
+  background-color: #eef1f4;
+  color: #333;
+  border: 1px solid #d5dae0;
+}
+
+.btn-secondary:hover { background-color: #e0e5ea; }
+
+button[hidden] { display: none; }
 
 button {
   background-color: #4CAF50;
