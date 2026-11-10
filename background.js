@@ -11,7 +11,6 @@
 import './common.js';
 const TT = globalThis.TT;
 
-const SERVER_URL = 'http://localhost:4000';
 const TICK_ALARM = 'tick';
 const MIDNIGHT_ALARM = 'midnight';
 const IDLE_SECONDS = 60;
@@ -99,20 +98,16 @@ async function creditElapsed(state, now) {
   const dates = Object.keys(additions);
   if (dates.length === 0) return cursor;
 
-  const { timeData = {}, syncQueue = {} } =
-    await chrome.storage.local.get(['timeData', 'syncQueue']);
+  const { timeData = {} } = await chrome.storage.local.get('timeData');
 
   for (const date of dates) {
     const secs = additions[date];
     timeData[date] = timeData[date] || {};
     timeData[date][state.hostname] = (timeData[date][state.hostname] || 0) + secs;
-
-    const key = `${date}|${state.hostname}`;
-    syncQueue[key] = (syncQueue[key] || 0) + secs;
     debugLog(`Tracked ${secs}s on ${state.hostname} (${date})`);
   }
 
-  await chrome.storage.local.set({ timeData, syncQueue });
+  await chrome.storage.local.set({ timeData });
   try {
     await checkAlerts(timeData);
   } catch (err) {
@@ -238,52 +233,6 @@ function sync() {
   });
 }
 
-// ---------- MongoDB sync (persistent queue with retry) ----------
-
-let flushing = false;
-
-async function flushQueue() {
-  if (flushing) return;
-  flushing = true;
-  try {
-    const { syncQueue = {} } = await chrome.storage.local.get('syncQueue');
-    const entries = Object.entries(syncQueue).filter(([, secs]) => secs > 0);
-    if (entries.length === 0) return;
-
-    const payload = entries.map(([key, time]) => {
-      const i = key.indexOf('|');
-      return { date: key.slice(0, i), site: key.slice(i + 1), time };
-    });
-
-    try {
-      const res = await fetch(`${SERVER_URL}/track`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(8000)
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    } catch (err) {
-      // Keep the queue; it will be retried on the next tick.
-      console.warn('MongoDB sync failed, will retry:', err.message);
-      return;
-    }
-
-    debugLog('Synced to MongoDB:', payload);
-    await withLock(async () => {
-      const { syncQueue: current = {} } = await chrome.storage.local.get('syncQueue');
-      for (const [key, sent] of entries) {
-        const remaining = (current[key] || 0) - sent;
-        if (remaining > 0) current[key] = remaining;
-        else delete current[key];
-      }
-      await chrome.storage.local.set({ syncQueue: current });
-    });
-  } finally {
-    flushing = false;
-  }
-}
-
 // ---------- alarms ----------
 
 function setupAlarms() {
@@ -295,7 +244,6 @@ function setupAlarms() {
 chrome.alarms.onAlarm.addListener(async alarm => {
   if (alarm.name === TICK_ALARM) {
     await sync();
-    await flushQueue();
   } else if (alarm.name === MIDNIGHT_ALARM) {
     await sync(); // splits any time across midnight into the right days
     chrome.alarms.create(MIDNIGHT_ALARM, { when: nextLocalMidnight(Date.now()) + 1000 });
@@ -323,6 +271,8 @@ chrome.runtime.onInstalled.addListener(async details => {
   const { timeData } = await chrome.storage.local.get('timeData');
   // Never wipe existing history (this also fires on extension updates).
   if (!timeData) await chrome.storage.local.set({ timeData: {} });
+  // The old server-sync queue is no longer used; drop any leftover data.
+  await chrome.storage.local.remove('syncQueue');
   setupAlarms();
   sync();
 });
@@ -355,7 +305,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
     if (msg && (msg.type === 'getStatus' || msg.type === 'setSiteState')) {
       const state = await sync();
-      if (msg.type === 'setSiteState') flushQueue();
       const { timeData = {} } = await chrome.storage.local.get('timeData');
       const seconds = state.hostname
         ? (timeData[localDateKey()]?.[state.hostname] || 0)

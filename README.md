@@ -27,7 +27,7 @@ Build a Chrome Extension that automatically starts tracking time spent on each w
 
 Ensure that time is tracked accurately and continuously while the tab is active.
 
-Sync tracked time to a Node.js + MongoDB backend in real-time.
+Store all tracked data locally in the browser (chrome.storage.local) - no server or account needed, nothing leaves the user's computer.
 
 Display live tracked time in the extension popup.
 
@@ -47,7 +47,7 @@ Once a website is opened or switched to, a timer starts automatically.
 
 If the tab is changed, closed, or the user becomes inactive, the timer stops.
 
-Time is updated every second and sent to the backend using fetch API to persist time in MongoDB.
+Time is saved locally in chrome.storage.local, so it survives browser restarts.
 
 A flush mechanism ensures no time is lost during popup close or extension shutdown.
 
@@ -57,17 +57,15 @@ Displays the hostname of the active site.
 
 Shows the live timer updating every second.
 
-Tracks time from scratch without depending on the backend for timer values (ensures consistency and avoids rewind bugs).
+Timer values come from the locally stored data (ensures consistency and avoids rewind bugs).
 
-Syncs time to backend in real-time (every second).
+Saves time locally as you browse.
 
-3. Backend Integration:
+3. Local Storage:
 
-Backend is built using Node.js and Express, with time data stored in MongoDB.
+All data is stored locally on the user's computer; there is no backend server.
 
-POST requests are sent to an endpoint (/api/usage/usage) with hostname and timeSpent.
-
-Backend stores or updates time entries grouped by website and date.
+Time entries are grouped by date and website in chrome.storage.local (with the unlimitedStorage permission), and can be exported / restored as a JSON backup from the Settings page.
 
 4. Analytics Dashboard:
 
@@ -79,9 +77,9 @@ Productive vs Unproductive time is shown for each day.
 
 5. Persistent Storage:
 
-Uses chrome.storage.local to store data for quick access within the extension.
+Uses chrome.storage.local (time data) and chrome.storage.sync (classifications and goals).
 
-Backend handles long-term analytics and aggregations.
+Analytics and reports are computed in the extension from the locally stored data.
 
 Technical Stack:
 
@@ -93,11 +91,9 @@ Chrome Extension APIs (chrome.tabs, chrome.runtime, chrome.storage)
 
 Chart.js for visual analytics
 
-Backend:
+Storage:
 
-Node.js with Express
-
-MongoDB with Mongoose (v7+)
+chrome.storage.local / sync / session (no backend)
 
 Data Flow:
 
@@ -105,9 +101,9 @@ Real-time timer in popup script
 
 Background script monitors tab activity
 
-Backend receives usage data and updates MongoDB
+Background script saves usage data to chrome.storage.local
 
-Dashboard fetches data from MongoDB and renders charts
+Analytics page reads the local data and renders charts
 
 Final Outcome
 This task resulted in a fully functioning Chrome Extension that:
@@ -116,7 +112,7 @@ Accurately tracks time spent per site.
 
 Displays a live-updating timer.
 
-Sends tracked data to a backend in real-time.
+Stores all tracked data locally and privately on the user's computer.
 
 Offers a visual analytics dashboard with productivity breakdowns.
 

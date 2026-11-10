@@ -8,10 +8,8 @@
     "storage",
     "alarms",
     "idle",
-    "notifications"
-  ],
-  "host_permissions": [
-    "http://localhost:4000/*"
+    "notifications",
+    "unlimitedStorage"
   ],
   "options_page": "options.html",
   "background": {
