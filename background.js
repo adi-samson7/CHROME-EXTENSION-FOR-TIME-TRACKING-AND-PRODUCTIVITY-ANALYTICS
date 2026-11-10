@@ -8,6 +8,9 @@
 //      tracked site (split at local midnight),
 //   2. re-evaluates what is being tracked now (active tab, focus, idle, pause).
 
+import './common.js';
+const TT = globalThis.TT;
+
 const SERVER_URL = 'http://localhost:4000';
 const TICK_ALARM = 'tick';
 const MIDNIGHT_ALARM = 'midnight';
@@ -110,7 +113,62 @@ async function creditElapsed(state, now) {
   }
 
   await chrome.storage.local.set({ timeData, syncQueue });
+  try {
+    await checkAlerts(timeData);
+  } catch (err) {
+    console.warn('Alert check failed:', err);
+  }
   return cursor;
+}
+
+// ---------- goal & limit notifications ----------
+
+function notify(id, title, message) {
+  chrome.notifications.create(id, {
+    type: 'basic',
+    iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+    title,
+    message
+  });
+}
+
+// Fires each notification at most once per day.
+async function checkAlerts(timeData) {
+  const today = localDateKey();
+  const day = timeData[today];
+  if (!day) return;
+
+  const [goals, cls, { notified }] = await Promise.all([
+    TT.getGoals(),
+    TT.getClassifications(),
+    chrome.storage.local.get('notified')
+  ]);
+  const state = notified && notified.date === today ? notified : { date: today, keys: [] };
+  let changed = false;
+
+  for (const [domain, minutes] of Object.entries(goals.siteLimits)) {
+    const key = `limit:${domain}`;
+    if (!(minutes > 0) || state.keys.includes(key)) continue;
+    if (TT.secondsForDomain(day, domain) >= minutes * 60) {
+      state.keys.push(key);
+      changed = true;
+      notify(`${key}:${today}`, 'Daily limit reached',
+        `You have used your ${minutes} minute limit for ${domain} today.`);
+    }
+  }
+
+  if (goals.dailyProductiveMinutes > 0 && !state.keys.includes('goal')) {
+    if (TT.productiveSeconds(day, cls) >= goals.dailyProductiveMinutes * 60) {
+      state.keys.push('goal');
+      changed = true;
+      notify(`goal:${today}`, 'Daily goal reached',
+        `Nice work - you hit your ${goals.dailyProductiveMinutes} minute productive-time goal.`);
+    }
+  }
+
+  if (changed || !notified || notified.date !== today) {
+    await chrome.storage.local.set({ notified: state });
+  }
 }
 
 // ---------- current context ----------
@@ -258,7 +316,10 @@ chrome.windows.onFocusChanged.addListener(() => sync());
 chrome.idle.setDetectionInterval(IDLE_SECONDS);
 chrome.idle.onStateChanged.addListener(() => sync());
 
-chrome.runtime.onInstalled.addListener(async () => {
+chrome.runtime.onInstalled.addListener(async details => {
+  if (details.reason === 'install') {
+    chrome.tabs.create({ url: chrome.runtime.getURL('onboarding.html') });
+  }
   const { timeData } = await chrome.storage.local.get('timeData');
   // Never wipe existing history (this also fires on extension updates).
   if (!timeData) await chrome.storage.local.set({ timeData: {} });

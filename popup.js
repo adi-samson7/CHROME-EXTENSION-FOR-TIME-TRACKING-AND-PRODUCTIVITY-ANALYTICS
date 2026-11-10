@@ -5,6 +5,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const toggleButton = document.getElementById('toggle-tracking');
   const analyticsButton = document.getElementById('view-analytics');
 
+  const goalBox = document.getElementById('goal-box');
+  const goalText = document.getElementById('goal-text');
+  const goalFill = document.getElementById('goal-fill');
+  const limitLine = document.getElementById('limit-line');
+  const classifyBox = document.getElementById('classify-box');
   const copyButton = document.getElementById('copy-website');
   const statusText = document.getElementById('status-text');
   let current = { hostname: null, siteState: null };
@@ -73,8 +78,62 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Goal progress, site limit and classification prompt for the current site.
+  async function renderExtras(hostname) {
+    const [{ timeData = {} }, cls, goals] = await Promise.all([
+      chrome.storage.local.get('timeData'),
+      TT.getClassifications(),
+      TT.getGoals()
+    ]);
+    const day = timeData[TT.localDateKey()] || {};
+
+    if (goals.dailyProductiveMinutes > 0) {
+      const done = TT.productiveSeconds(day, cls);
+      const goalSecs = goals.dailyProductiveMinutes * 60;
+      goalBox.hidden = false;
+      goalText.textContent = `${TT.formatDuration(done)} / ${TT.formatDuration(goalSecs)}`;
+      const pct = Math.min(100, Math.round((done / goalSecs) * 100));
+      goalFill.style.width = `${pct}%`;
+      goalFill.classList.toggle('reached', done >= goalSecs);
+    } else {
+      goalBox.hidden = true;
+    }
+
+    limitLine.hidden = true;
+    classifyBox.hidden = true;
+    if (!hostname) return;
+
+    // The tightest limit that applies to this site.
+    let best = null;
+    for (const [domain, minutes] of Object.entries(goals.siteLimits)) {
+      if (hostname === domain || hostname.endsWith('.' + domain)) {
+        const left = minutes * 60 - TT.secondsForDomain(day, domain);
+        if (!best || left < best.left) best = { domain, left };
+      }
+    }
+    if (best) {
+      limitLine.hidden = false;
+      limitLine.classList.toggle('over', best.left <= 0);
+      limitLine.textContent = best.left > 0
+        ? `Limit: ${TT.formatDuration(best.left)} left for ${best.domain}`
+        : `Daily limit reached for ${best.domain}`;
+    }
+
+    if (TT.classify(hostname, cls) === 'unclassified') classifyBox.hidden = false;
+  }
+
   async function refresh() {
-    render(await send({ type: 'getStatus' }));
+    const status = await send({ type: 'getStatus' });
+    render(status);
+    if (status && !status.error) await renderExtras(status.hostname);
+  }
+
+  for (const type of ['productive', 'unproductive']) {
+    document.getElementById(`classify-${type}`).addEventListener('click', async () => {
+      if (!current.hostname) return;
+      await TT.setClassification(TT.baseDomain(current.hostname), type);
+      refresh();
+    });
   }
 
   toggleButton.addEventListener('click', async () => {

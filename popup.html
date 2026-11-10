@@ -18,12 +18,23 @@
     </div>
     <div id="time-counter">00:00:00</div>
     <div id="tracking-status" class="tracking-status"><span class="status-dot"></span><span id="status-text">Checking...</span></div>
+    <div id="goal-box" class="goal-box" hidden>
+      <div class="goal-head"><span>Daily goal</span><span id="goal-text"></span></div>
+      <div class="goal-bar"><div id="goal-fill" class="goal-fill"></div></div>
+    </div>
+    <div id="limit-line" class="limit-line" hidden></div>
+    <div id="classify-box" class="classify-box" hidden>
+      <span>Classify this site:</span>
+      <button id="classify-productive" class="mini-btn productive">Productive</button>
+      <button id="classify-unproductive" class="mini-btn unproductive">Unproductive</button>
+    </div>
     <button id="toggle-tracking" class="btn-primary" hidden>Start Tracking</button>
     <div class="secondary-actions">
       <button id="view-analytics" class="btn-secondary">View Analytics</button>
       <button id="open-options" class="btn-secondary">Configure Websites</button>
     </div>
   </div>
+  <script src="common.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

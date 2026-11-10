@@ -10,7 +10,7 @@
 <body class="page">
   <div class="options-container">
     <h1>Website Productivity Classifier</h1>
-    
+
     <div class="classification-section">
       <h2>Add Website Classification</h2>
       <div class="input-group">
@@ -22,24 +22,71 @@
         <button id="add-classification">Add</button>
       </div>
     </div>
-    
+
     <div class="current-classifications">
       <h2>Current Classifications</h2>
+
+      <div class="list-controls">
+        <input type="text" id="class-search" placeholder="Search websites...">
+        <select id="class-sort" aria-label="Sort websites">
+          <option value="name-asc">Name A-Z</option>
+          <option value="name-desc">Name Z-A</option>
+          <option value="newest">Newest first</option>
+        </select>
+      </div>
+
       <div class="tabs">
         <button class="tab-button active" data-tab="productive">Productive</button>
         <button class="tab-button" data-tab="unproductive">Unproductive</button>
       </div>
-      
+
       <div id="productive-list" class="tab-content active">
         <ul id="productive-websites-list"></ul>
       </div>
-      
+
       <div id="unproductive-list" class="tab-content">
         <ul id="unproductive-websites-list"></ul>
       </div>
     </div>
+
+    <div class="settings-section">
+      <h2>Daily Goal &amp; Limits</h2>
+      <p class="hint">Get a notification when you reach your productive-time goal or a site's daily limit. The goal also drives your streak.</p>
+
+      <label class="field-label" for="goal-minutes">Daily productive goal (minutes, 0 = off)</label>
+      <div class="input-group">
+        <input type="number" id="goal-minutes" min="0" max="1440" step="5">
+        <button id="save-goal">Save goal</button>
+      </div>
+      <div id="goal-status" class="status-msg" aria-live="polite"></div>
+
+      <label class="field-label">Site limits</label>
+      <div class="input-group">
+        <input type="text" id="limit-domain" placeholder="Domain (e.g., youtube.com)">
+        <input type="number" id="limit-minutes" class="narrow" min="1" max="1440" placeholder="Minutes">
+        <button id="add-limit">Add</button>
+      </div>
+      <ul id="limits-list" class="plain-list"></ul>
+    </div>
+
+    <div class="settings-section">
+      <h2>Backup &amp; Restore</h2>
+      <p class="hint">Export your tracked time, classifications, goals and limits to a JSON file, or restore them from a backup.</p>
+      <div class="button-row">
+        <button id="export-backup" class="export-button">Export backup</button>
+        <button id="import-backup" class="export-button secondary">Import backup</button>
+        <input type="file" id="import-file" accept="application/json,.json" hidden>
+      </div>
+      <div id="backup-status" class="status-msg" aria-live="polite"></div>
+    </div>
+
+    <div class="settings-section">
+      <h2>Setup</h2>
+      <button id="run-onboarding" class="export-button secondary">Run first-time setup again</button>
+    </div>
   </div>
-  
+
+  <script src="common.js"></script>
   <script src="options.js"></script>
 </body>
 </html>
