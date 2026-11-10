@@ -54,7 +54,10 @@ document.addEventListener('DOMContentLoaded', () => {
         statusEl.classList.add('active');
         statusText.textContent = 'Tracking';
       } else if (!status.focused) {
-        statusText.textContent = 'Browser not focused';
+        // The popup itself takes focus away from the browser window, so the
+        // timer only runs once it is closed.
+        statusEl.classList.add('waiting');
+        statusText.textContent = 'Close this popup to start tracking';
       } else {
         statusText.textContent = 'Idle - timer stopped';
       }

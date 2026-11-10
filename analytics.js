@@ -30,6 +30,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     return new Date(`${key}T00:00:00`);
   }
 
+  // e.g. "11/10/2026 (Tue)"
+  function formatDateWithDay(key) {
+    const d = parseLocalDate(key);
+    const day = d.toLocaleDateString(undefined, { weekday: 'short' });
+    return `${d.toLocaleDateString()} (${day})`;
+  }
+
   function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, c => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -284,7 +291,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       dailyTableBody.innerHTML = Object.entries(report.byDay).map(([date, data]) => `
         <tr>
-          <td>${parseLocalDate(date).toLocaleDateString()}</td>
+          <td>${formatDateWithDay(date)}</td>
           <td>${formatTime(data.productive)}</td>
           <td>${formatTime(data.unproductive)}</td>
         </tr>
@@ -416,7 +423,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     doc.setFontSize(11);
     Object.entries(report.byDay).forEach(([date, data]) => {
-      doc.text(date, margin, yPos);
+      doc.text(formatDateWithDay(date), margin, yPos);
       doc.text(formatTime(data.productive), margin + 60, yPos);
       doc.text(formatTime(data.unproductive), margin + 120, yPos);
       yPos += 6;
