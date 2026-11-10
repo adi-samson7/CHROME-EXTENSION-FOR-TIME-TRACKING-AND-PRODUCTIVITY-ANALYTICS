@@ -104,7 +104,13 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.textContent = type === 'productive' ? 'Productive' : 'Unproductive';
         btn.addEventListener('click', async () => {
           btn.disabled = true;
-          await setClassification(baseDomain(site), type);
+          try {
+            await setClassification(baseDomain(site), type);
+          } catch (err) {
+            alert(err.message);
+            btn.disabled = false;
+            return;
+          }
           await refreshAll();
         });
         actions.appendChild(btn);

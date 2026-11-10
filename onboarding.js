@@ -56,15 +56,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     const minutes = Number(goalInput.value);
     const safeMinutes = Number.isFinite(minutes) && minutes >= 0 && minutes <= 1440 ? Math.round(minutes) : 120;
 
-    await chrome.storage.sync.set({
-      websiteClassifications: {
+    try {
+      await TT.saveClassifications({
         productive: [...selected.productive],
         unproductive: [...selected.unproductive]
-      }
-    });
-    const current = await getGoals();
-    current.dailyProductiveMinutes = safeMinutes;
-    await setGoals(current);
+      });
+      const current = await getGoals();
+      current.dailyProductiveMinutes = safeMinutes;
+      await setGoals(current);
+    } catch (err) {
+      alert(err.message);
+      return;
+    }
     await chrome.storage.local.set({ onboardingDone: true });
 
     document.getElementById('setup').hidden = true;

@@ -102,8 +102,22 @@
     cls.productive = cls.productive.filter(d => d !== domain);
     cls.unproductive = cls.unproductive.filter(d => d !== domain);
     if (type === 'productive' || type === 'unproductive') cls[type].push(domain);
-    await chrome.storage.sync.set({ websiteClassifications: cls });
+    await saveClassifications(cls);
     return cls;
+  }
+
+  // chrome.storage.sync allows 8192 bytes per item; stay a little below it.
+  const SYNC_ITEM_LIMIT = 8000;
+
+  function fitsSync(key, value) {
+    return key.length + new TextEncoder().encode(JSON.stringify(value)).length <= SYNC_ITEM_LIMIT;
+  }
+
+  async function saveClassifications(cls) {
+    if (!fitsSync('websiteClassifications', cls)) {
+      throw new Error('Too many classified websites - please remove some and try again.');
+    }
+    await chrome.storage.sync.set({ websiteClassifications: cls });
   }
 
   // ---------- goals & limits ----------
@@ -126,6 +140,9 @@
   }
 
   async function setGoals(goals) {
+    if (!fitsSync('goals', goals)) {
+      throw new Error('Too many site limits - please remove some and try again.');
+    }
     await chrome.storage.sync.set({ goals });
   }
 
@@ -150,7 +167,7 @@
     localDateKey, parseLocalDate, addDays, dateRange,
     formatTime, formatDuration, formatDateWithDay, escapeHtml,
     isListed, classify, baseDomain,
-    getClassifications, setClassification,
+    getClassifications, setClassification, saveClassifications, fitsSync,
     DEFAULT_GOALS, getGoals, setGoals,
     secondsForDomain, productiveSeconds
   };

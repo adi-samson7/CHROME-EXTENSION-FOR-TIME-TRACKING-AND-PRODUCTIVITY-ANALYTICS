@@ -53,7 +53,10 @@ function getHostname(url) {
 
   try {
     const { hostname } = new URL(url);
-    return hostname.includes('.') ? hostname : null;
+    if (!hostname.includes('.')) return null;
+    // "www.youtube.com" and "youtube.com" are tracked as one site.
+    const base = TT.baseDomain(hostname);
+    return base.includes('.') ? base : hostname;
   } catch {
     return null;
   }
@@ -65,6 +68,34 @@ function withLock(fn) {
   const run = lock.then(fn);
   lock = run.catch(() => {});
   return run;
+}
+
+// One-time cleanup: older versions stored "www.x.com" separately from "x.com".
+// Merges those rows (time is added together, tracking state is kept).
+async function mergeWwwHosts() {
+  const { timeData = {}, siteStates = {} } =
+    await chrome.storage.local.get(['timeData', 'siteStates']);
+  let changed = false;
+
+  for (const day of Object.values(timeData)) {
+    for (const host of Object.keys(day)) {
+      const base = TT.baseDomain(host);
+      if (base === host || !base.includes('.')) continue;
+      day[base] = (day[base] || 0) + day[host];
+      delete day[host];
+      changed = true;
+    }
+  }
+
+  for (const host of Object.keys(siteStates)) {
+    const base = TT.baseDomain(host);
+    if (base === host || !base.includes('.')) continue;
+    if (siteStates[base] !== 'tracking') siteStates[base] = siteStates[host];
+    delete siteStates[host];
+    changed = true;
+  }
+
+  if (changed) await chrome.storage.local.set({ timeData, siteStates });
 }
 
 // ---------- crediting time ----------
@@ -273,6 +304,7 @@ chrome.runtime.onInstalled.addListener(async details => {
   if (!timeData) await chrome.storage.local.set({ timeData: {} });
   // The old server-sync queue is no longer used; drop any leftover data.
   await chrome.storage.local.remove('syncQueue');
+  await withLock(mergeWwwHosts);
   setupAlarms();
   sync();
 });

@@ -24,6 +24,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const DOMAIN_RE = /^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}$/i;
 
+  // Inline trash icon (no external icon font needed).
+  const TRASH_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
+    '<path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
+
+  // Limits for imported backups, so a crafted file can't bloat storage.
+  const MAX_DAYS = 3700;
+  const MAX_SITES_PER_DAY = 2000;
+  const MAX_HOST_LEN = 253;
+  const HOST_RE = /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/i;
+
   function flash(el, message, isError) {
     el.textContent = message;
     el.classList.toggle('error', !!isError);
@@ -85,7 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.dataset.website = website;
       btn.dataset.type = type;
       btn.title = 'Remove';
-      btn.innerHTML = '<i class="material-icons">delete</i>';
+      btn.innerHTML = TRASH_SVG;
       btn.addEventListener('click', removeClassification);
 
       li.append(name, btn);
@@ -109,7 +120,12 @@ document.addEventListener('DOMContentLoaded', () => {
     cls[opposite] = cls[opposite].filter(w => w !== website);
     if (!cls[type].includes(website)) cls[type].push(website);
 
-    await chrome.storage.sync.set({ websiteClassifications: cls });
+    try {
+      await TT.saveClassifications(cls);
+    } catch (err) {
+      alert(err.message);
+      return;
+    }
     websiteInput.value = '';
     loadClassifications();
   }
@@ -118,7 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const { website, type } = e.currentTarget.dataset;
     const cls = await getClassifications();
     cls[type] = cls[type].filter(w => w !== website);
-    await chrome.storage.sync.set({ websiteClassifications: cls });
+    await TT.saveClassifications(cls);
     loadClassifications();
   }
 
@@ -147,7 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const btn = document.createElement('button');
       btn.className = 'remove-btn';
       btn.title = 'Remove limit';
-      btn.innerHTML = '<i class="material-icons">delete</i>';
+      btn.innerHTML = TRASH_SVG;
       btn.addEventListener('click', async () => {
         const goals = await getGoals();
         delete goals.siteLimits[domain];
@@ -167,7 +183,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const goals = await getGoals();
     goals.dailyProductiveMinutes = Math.round(minutes);
-    await setGoals(goals);
+    try {
+      await setGoals(goals);
+    } catch (err) {
+      flash(goalStatus, err.message, true);
+      return;
+    }
     flash(goalStatus, minutes === 0 ? 'Goal turned off.' : 'Goal saved.');
   });
 
@@ -184,7 +205,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const goals = await getGoals();
     goals.siteLimits[domain] = Math.round(minutes);
-    await setGoals(goals);
+    try {
+      await setGoals(goals);
+    } catch (err) {
+      flash(goalStatus, err.message, true);
+      return;
+    }
     limitDomain.value = '';
     limitMinutes.value = '';
     flash(goalStatus, `Limit saved for ${domain}.`);
@@ -265,21 +291,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const dateRe = /^\d{4}-\d{2}-\d{2}$/;
 
     if (!isObj(b.timeData)) throw new Error('Missing time data.');
+    // Hostnames are stored without "www." so www.x.com and x.com merge.
+    const cleanHost = raw => {
+      const h = String(raw).toLowerCase();
+      if (h.length > MAX_HOST_LEN || !HOST_RE.test(h)) return null;
+      return TT.baseDomain(h);
+    };
+
     const timeData = {};
-    for (const [date, day] of Object.entries(b.timeData)) {
-      if (!dateRe.test(date) || !isObj(day)) throw new Error(`Invalid day entry: ${date}`);
+    const dayEntries = Object.entries(b.timeData);
+    if (dayEntries.length > MAX_DAYS) throw new Error('Too many days in this backup.');
+    for (const [date, day] of dayEntries) {
+      if (!dateRe.test(date) || !isObj(day)) throw new Error(`Invalid day entry: ${date.slice(0, 20)}`);
+      const siteEntries = Object.entries(day);
+      if (siteEntries.length > MAX_SITES_PER_DAY) throw new Error(`Too many websites on ${date}.`);
       timeData[date] = {};
-      for (const [site, secs] of Object.entries(day)) {
+      for (const [rawSite, secs] of siteEntries) {
+        const site = cleanHost(rawSite);
+        if (!site) throw new Error(`Invalid website name on ${date}.`);
         if (typeof secs !== 'number' || !Number.isFinite(secs) || secs < 0 || secs > 86400) {
           throw new Error(`Invalid time for ${site} on ${date}`);
         }
-        timeData[date][site] = Math.round(secs);
+        timeData[date][site] = Math.min(86400, (timeData[date][site] || 0) + Math.round(secs));
       }
     }
 
     const c = isObj(b.classifications) ? b.classifications : {};
-    const domains = arr => (Array.isArray(arr) ? arr : [])
-      .filter(d => typeof d === 'string' && DOMAIN_RE.test(d)).map(d => d.toLowerCase());
+    const domains = arr => [...new Set((Array.isArray(arr) ? arr : [])
+      .filter(d => typeof d === 'string' && d.length <= MAX_HOST_LEN && DOMAIN_RE.test(d))
+      .map(d => d.toLowerCase()))];
     const classifications = {
       productive: domains(c.productive),
       unproductive: domains(c.unproductive)
@@ -300,9 +340,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const siteStates = {};
     if (isObj(b.siteStates)) {
-      for (const [site, st] of Object.entries(b.siteStates)) {
-        if (st === 'tracking' || st === 'paused') siteStates[site] = st;
+      for (const [rawSite, st] of Object.entries(b.siteStates).slice(0, MAX_DAYS * 2)) {
+        const site = cleanHost(rawSite);
+        if (!site || (st !== 'tracking' && st !== 'paused')) continue;
+        if (siteStates[site] !== 'tracking') siteStates[site] = st;
       }
+    }
+
+    // chrome.storage.sync has a per-item size limit.
+    if (!TT.fitsSync('websiteClassifications', classifications)) {
+      throw new Error('This backup has too many classified websites for Chrome to store.');
+    }
+    if (!TT.fitsSync('goals', goals)) {
+      throw new Error('This backup has too many site limits for Chrome to store.');
     }
 
     return { timeData, classifications, goals, siteStates };

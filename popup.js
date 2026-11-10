@@ -131,7 +131,12 @@ document.addEventListener('DOMContentLoaded', () => {
   for (const type of ['productive', 'unproductive']) {
     document.getElementById(`classify-${type}`).addEventListener('click', async () => {
       if (!current.hostname) return;
-      await TT.setClassification(TT.baseDomain(current.hostname), type);
+      try {
+        await TT.setClassification(TT.baseDomain(current.hostname), type);
+      } catch (err) {
+        alert(err.message);
+        return;
+      }
       refresh();
     });
   }
